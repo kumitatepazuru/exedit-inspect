@@ -1,0 +1,11 @@
+[project]
+name = "exedit-inspect"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "angr>=9.3.0",
+    "capstone>=5.0.6",
+    "pefile>=2024.8.26",
+]
