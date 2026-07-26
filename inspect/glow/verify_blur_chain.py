@@ -19,7 +19,9 @@ Findings, both read straight out of the operands below:
     the final glow is the sum of all six differently-sized blurs, not just
     the widest one.
 
-  * Step 1 slides by the row stride (fpip->line_size * 6 bytes) => it is the
+  * Step 1 slides by the row stride (*(fpip+0x14) * 6 bytes - that field is
+    FILTER_PROC_INFO's max_w, a pixel count, not the byte count line_size,
+    which lives at +0x44 and exedit never reads) => it is the
     VERTICAL pass, and it reads the radius/kernel globals 0x101b1fe8 /
     0x101b1ff0, which sub_10053a30 clamped against h/2-1. Step 2 slides by 6
     bytes = one pixel => HORIZONTAL, reading 0x101b1fec / 0x101b1ff8, clamped

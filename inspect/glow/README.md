@@ -44,7 +44,7 @@ uv run main.py inspect/glow/<script>.py
 | チェックボックス | `光色の設定`, `サイズ固定` | `光色の設定` のみ |
 | 入力画像 | `*(fpip+0xAC)` | `fpip->ycp_edit` (`+4`) |
 | 画素形式 | **8バイト/画素 PIXEL_YCA**(y, cb, cr, **a**) | 6バイト/画素 PIXEL_YC(アルファなし) |
-| 行幅 | `*(fpip+0xEC)` [画素] | `fpip->line_size` (`+0x14`) [画素] |
+| 行幅 | `*(fpip+0xEC)` [画素] | `fpip->max_w` (`+0x14`) [画素] |
 | 幅・高さ | `*(fpip+0xB4)` / `*(fpip+0xB8)` | `fpip->w` (`+0xC`) / `fpip->h` (`+0x10`) |
 | 発光元バッファ | `fpip->ycp_temp` (`+8`)、6バイト/画素 | 同左 |
 | 蓄積バッファ | `*(fpip+0xB0)`、6バイト/画素 | `拡散速度=0`: `ycp_edit` に直接 / `>0`: `*(fpip+0xB0)` |

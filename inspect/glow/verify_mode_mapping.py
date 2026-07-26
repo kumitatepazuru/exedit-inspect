@@ -12,6 +12,7 @@ which struct fields each side uses:
                        (PIXEL_YCA: y, cb, cr, a - alpha at +6)
   flag & 0x20 CLEAR -> image = fpip->ycp_edit (+4), scratch = ycp_temp (+8),
                        w/h = fpip->w (+0xC) / fpip->h (+0x10),
+                       line width = fpip->max_w (+0x14) in pixels,
                        stride 6 bytes/pixel (PIXEL_YC, no alpha)
 
 An 8-byte-per-pixel buffer with an alpha channel is exedit's own object
@@ -49,7 +50,8 @@ ANNOTATIONS = {
     0x1005326A: "extract worker sub_100534b0 (frame, bit24 CLEAR = use picked color)",
     0x10053275: "diffusion speed (0x101b2000) - frame path only runs the curve block when > 0",
     0x1005329B: "ecx = *(fpip+0xB0) = glow accumulator buffer",
-    0x100532A7: "call exfunc[0x48](accumulator, 0,0, w, h, ...) - clear it",
+    0x1005328F: "eax = fp+0x64 = exedit's own helper table (0x100a41e0), NOT AviUtl's EXFUNC",
+    0x100532A7: "call table[0x48](accumulator, 0,0, w, h, ...) - clear it",
     0x100532CB: "call sub_10070550(accumulator, w, h, speed) - forward curve",
     0x100532E8: "call sub_10070550(ycp_temp,    w, h, speed) - forward curve",
     0x10053330: "call sub_10053a30(radius, fp, fpip) - one of the 6 blur passes",
@@ -87,7 +89,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
         "\n"
         "  flag & 0x20 CLEAR -> FRAME (VIDEO) FILTER\n"
         "      image    : fpip->ycp_edit (+4), 6 bytes/pixel = PIXEL_YC (no alpha)\n"
-        "      row pitch: fpip->line_size (+0x14)      w/h: fpip->w (+0xC), fpip->h (+0x10)\n"
+        "      row pitch: fpip->max_w (+0x14) px       w/h: fpip->w (+0xC), fpip->h (+0x10)\n"
         "      glow src : fpip->ycp_temp (+8)          accum: ycp_edit itself, or\n"
         "                 *(fpip+0xB0) when diffusion speed > 0\n"
         "      extract  : sub_100533c0 / sub_100534b0  composite: sub_10053800 (speed>0 only)\n"
