@@ -34,6 +34,14 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/glint`](inspect/glint/README.md) | `閃光` | 中心へ向かう放射状の光線サンプリング。輝度をそのままアルファに移して出力 |
 | [`inspect/diffusion_light`](inspect/diffusion_light/README.md) | `拡散光` | 画像そのもののボックス平均を2ラウンド。「元より明るくなった画素だけ」書き戻す |
 
+## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
+
+同定済みのアドレス(関数・登録構造体・定数・グローバル)を1箇所に集めた索引と、
+エフェクトをまたいで共有されている実装の解説。合成モード、アルファ加重の
+ボックス平均、指数/対数の輝度カーブ、RGB→YCbCr、登録構造体とディスパッチ、
+キャンバス拡張、整数の丸め ―― このあたりは個別 README を読み直さなくても
+`inspect/common/` で足りる。**新しいエフェクトを解析するときの出発点**。
+
 ## 共通ツール (`tools/`)
 
 エフェクト非依存の部分はここに集約してある。`inspect/` 配下のスクリプトはすべて
