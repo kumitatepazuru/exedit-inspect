@@ -32,6 +32,7 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/glow`](inspect/glow/README.md) | `発光` | 明部抽出 + 6段マルチスケールぼかし。`拡散速度` は指数/対数空間でのぼかし |
 | [`inspect/mozaic`](inspect/mozaic/README.md) | `モザイク` | ブロック平均と `タイル風` のハイライト |
 | [`inspect/glint`](inspect/glint/README.md) | `閃光` | 中心へ向かう放射状の光線サンプリング。輝度をそのままアルファに移して出力 |
+| [`inspect/diffusion_light`](inspect/diffusion_light/README.md) | `拡散光` | 画像そのもののボックス平均を2ラウンド。「元より明るくなった画素だけ」書き戻す |
 
 ## 共通ツール (`tools/`)
 
