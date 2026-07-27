@@ -50,7 +50,7 @@ KNOWN = [
 ]
 
 # Filters analysed in this repo, dumped in full by default.
-ANALYSED = ("モザイク", "発光", "ぼかし", "境界ぼかし", "閃光")
+ANALYSED = ("モザイク", "発光", "ぼかし", "境界ぼかし", "閃光", "拡散光")
 
 
 def _table(r) -> None:
