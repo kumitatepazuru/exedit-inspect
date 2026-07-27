@@ -25,8 +25,8 @@ Run via main.py:
     uv run main.py inspect/glow/verify_mode_mapping.py
 """
 
-import capstone
-import pefile
+from tools.disasm import dump_range
+from tools.pe_image import PEImage
 
 FUNC_PROC = (0x10053100, 0x2C0)
 
@@ -63,18 +63,9 @@ ANNOTATIONS = {
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    start, size = FUNC_PROC
-    print(f"--- func_proc @ 0x{start:08x}: mode branch and everything it selects ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        note = ANNOTATIONS.get(insn.address, "")
-        marker = f"    <-- {note}" if note else ""
-        print(f"0x{insn.address:08x}: {insn.mnemonic:7s} {insn.op_str}{marker}")
+    dump_range(PEImage(dll_path), *FUNC_PROC,
+               label="func_proc: mode branch and everything it selects",
+               resolve=False, annotations=ANNOTATIONS, mnemonic_width=7)
 
     print(
         "\n"

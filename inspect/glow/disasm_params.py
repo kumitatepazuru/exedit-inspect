@@ -25,11 +25,8 @@ Run via main.py:
     uv run main.py inspect/glow/disasm_params.py
 """
 
-import re
-import struct
-
-import capstone
-import pefile
+from tools.disasm import dump_all
+from tools.pe_image import PEImage
 
 FUNC_PROC = (0x10053100, 0x336)
 
@@ -49,37 +46,13 @@ DIFFUSION_SPEED_ENTRY = (0x10070550, 0x60)
 DIFFUSION_SPEED_WORKER = (0x100705c0, 0x140)
 
 
-def _resolve_const(insn, image_base, data):
-    m = re.search(r"0x[0-9a-fA-F]{7,8}\]", insn.op_str)
-    if not m:
-        return ""
-    addr = int(m.group(0)[:-1], 16)
-    rva = addr - image_base
-    if rva < 0 or rva + 8 > len(data):
-        return ""
-    f64 = struct.unpack_from("<d", data, rva)[0]
-    i32 = struct.unpack_from("<i", data, rva)[0]
-    return f"  ; f64={f64!r} i32={i32}"
-
-
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n--- {label} @ 0x{start:08x} ({size} bytes) ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        hint = _resolve_const(insn, image_base, data)
-        print(f"0x{insn.address:08x}: {insn.mnemonic} {insn.op_str}{hint}")
-
-
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    _dump(md, image_base, data, *FUNC_PROC, "func_proc (parameter setup + 6-pass blur loop)")
-    _dump(md, image_base, data, *GLOW_COLOR_SETUP, "sub_1006fed0 (光色の設定 -> Y/Cb/Cr, NOT 拡散速度)")
-    _dump(md, image_base, data, *DIFFUSION_SPEED_ENTRY, "sub_10070550 (拡散速度-gated buffer pass, entry/clamp)")
-    _dump(md, image_base, data, *DIFFUSION_SPEED_WORKER, "sub_100705c0 (per-thread worker: pow()-curve + byte quantize)")
+    dump_all(PEImage(dll_path), {
+        "func_proc (parameter setup + 6-pass blur loop)": FUNC_PROC,
+        "sub_1006fed0 (光色の設定 -> Y/Cb/Cr, NOT 拡散速度)": GLOW_COLOR_SETUP,
+        "sub_10070550 (拡散速度-gated buffer pass, entry/clamp)": DIFFUSION_SPEED_ENTRY,
+        "sub_100705c0 (per-thread worker: pow()-curve + byte quantize)": DIFFUSION_SPEED_WORKER,
+    })
 
     print(
         "\n"

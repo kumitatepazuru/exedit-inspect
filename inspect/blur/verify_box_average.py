@@ -34,8 +34,9 @@ Run via main.py:
     uv run main.py inspect/blur/verify_box_average.py
 """
 
-import capstone
-import pefile
+from tools.cints import c_div
+from tools.disasm import dump_range, function_body
+from tools.pe_image import PEImage
 
 OBJECT_GROW_INNER = (0x1000EB82, 0xE4)     # phase 1 of 0x1000eae0
 FAMILIES = {
@@ -67,24 +68,10 @@ ANNOTATIONS = {
 }
 
 
-def _body(md, data, image_base, addr, limit=0x700):
-    out = []
-    for insn in md.disasm(data[addr - image_base:addr - image_base + limit], addr):
-        if insn.mnemonic == "nop" and out and out[-1].mnemonic == "ret":
-            break
-        out.append(insn)
-    return out
-
-
 # --------------------------------------------------------------------------
 # Literal Python transcription of one vertical pass, per family.
 # A pixel is (y, cb, cr, a); `None` marks a destination row never written.
 # --------------------------------------------------------------------------
-
-def _trunc_div(a, b):
-    q = abs(a) // abs(b)
-    return q if (a < 0) == (b < 0) else -q
-
 
 class Acc:
     """The four running sums the workers keep in registers/stack slots."""
@@ -113,7 +100,7 @@ class Acc:
             cr = int(self.cr * 4096.0 / self.a)
         else:                                       # colour left untouched
             y, cb, cr = prev if prev else (0, 0, 0)
-        return (y, cb, cr, _trunc_div(self.a, divisor))
+        return (y, cb, cr, c_div(self.a, divisor))
 
 
 def pass_object_grow(src, radius):
@@ -164,7 +151,7 @@ def pass_frame(src, radius):
     row = 0
 
     def emit():
-        return (_trunc_div(sy, n), _trunc_div(scb, n), _trunc_div(scr, n), None)
+        return (c_div(sy, n), c_div(scb, n), c_div(scr, n), None)
 
     for _ in range(radius):                                  # phase 1: prefill
         y, cb, cr, _a = src[lead]; lead += 1
@@ -192,22 +179,15 @@ def pass_frame(src, radius):
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    start, size = OBJECT_GROW_INNER
-    print("--- 0x1000eae0 phase 1: accumulate one sample, then emit one pixel ---")
-    for insn in md.disasm(data[start - image_base:start - image_base + size], start):
-        note = ANNOTATIONS.get(insn.address, "")
-        print(f"0x{insn.address:08x}: {insn.mnemonic:8s} {insn.op_str}"
-              f"{'    <-- ' + note if note else ''}")
+    img = PEImage(dll_path)
+    dump_range(img, *OBJECT_GROW_INNER,
+               label="0x1000eae0 phase 1: accumulate one sample, then emit one pixel",
+               resolve=False, annotations=ANNOTATIONS)
 
     print("\n--- every alpha/luma divisor in the three vertical families ---")
     for addr, kind in FAMILIES.items():
         print(f"\n  0x{addr:08x}  {kind}")
-        body = _body(md, data, image_base, addr)
+        body = function_body(img, addr)
         for i, insn in enumerate(body):
             if insn.mnemonic != "idiv":
                 continue

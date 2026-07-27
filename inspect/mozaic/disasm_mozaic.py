@@ -23,10 +23,10 @@ Run via main.py:
 
 import argparse
 import re
-import struct
 
-import capstone
-import pefile
+from tools.disasm import dump_all
+from tools.pe_image import PEImage
+from tools.xrefs import scan
 
 # (start, size). Sizes run to the next function's aligned entry.
 REGIONS = {
@@ -54,44 +54,34 @@ FIELDS = {
 }
 
 
-def _annotate(insn, image_base, data):
-    for pat, name in FIELDS.items():
-        if pat in insn.op_str:
-            return f"   ; {name}"
-    m = re.search(r"0x[0-9a-fA-F]{7,8}", insn.op_str)
-    if not m:
+def make_annotator(img):
+    """Name the struct fields and globals this filter touches.
+
+    Rule-based rather than address-keyed because the claim being made is about
+    every access in the range - "these three globals and nothing else carry
+    state between func_proc and the workers".
+    """
+    def annotate(insn):
+        for pat, name in FIELDS.items():
+            if pat in insn.op_str:
+                return name
+        m = re.search(r"0x[0-9a-fA-F]{7,8}", insn.op_str)
+        if not m:
+            return ""
+        va = int(m.group(0), 16)
+        if va in GLOBALS:
+            return GLOBALS[va]
+        if insn.mnemonic.startswith("f") and img.valid(va, 8):  # x87 operand -> a double
+            return f"= {img.f64(va)!r}"
         return ""
-    addr = int(m.group(0), 16)
-    if addr in GLOBALS:
-        return f"   ; {GLOBALS[addr]}"
-    rva = addr - image_base
-    if not (0 <= rva and rva + 8 <= len(data)):
-        return ""
-    if insn.mnemonic.startswith("f"):        # x87 operand -> show it as a double
-        return f"   ; = {struct.unpack_from('<d', data, rva)[0]!r}"
-    return ""
+    return annotate
 
 
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n{'=' * 72}\n{label}  @ 0x{start:08x} ({size} bytes)\n{'=' * 72}")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        print(f"0x{insn.address:08x}: {insn.mnemonic:<8} {insn.op_str}"
-              f"{_annotate(insn, image_base, data)}")
-
-
-def _xref(image_base, data):
+def _xref(img):
     lo, hi = 0x1006B090, 0x1006BD26
     print(f"\n{'=' * 72}\nreferences to the three globals, anywhere in the image\n{'=' * 72}")
     for va in (0x101BAD24, 0x101BAD28, 0x101BAD2C):
-        hits, pos = [], 0
-        needle = struct.pack("<I", va)
-        while True:
-            pos = data.find(needle, pos)
-            if pos == -1:
-                break
-            hits.append(image_base + pos)
-            pos += 1
+        hits = scan(img, va)
         outside = [h for h in hits if not (lo <= h <= hi)]
         print(f"  0x{va:08x} {GLOBALS[va]:<34} {len(hits):2d} refs, "
               f"{len(outside)} outside 0x{lo:08x}..0x{hi:08x}"
@@ -106,21 +96,17 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
     parser.add_argument("--xref", action="store_true", help="only run the global cross-reference")
     args = parser.parse_args(argv or [])
 
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    img = PEImage(dll_path)
 
     if args.xref:
-        _xref(image_base, data)
+        _xref(img)
         return
 
     targets = {args.only: REGIONS[args.only]} if args.only else REGIONS
-    for label, (start, size) in targets.items():
-        _dump(md, image_base, data, start, size, label)
+    dump_all(img, targets, resolve=False, annotations=make_annotator(img))
 
     if not args.only:
-        _xref(image_base, data)
+        _xref(img)
         print("\nftol (0x10091ad8) note: `or ah, 0xc` sets the x87 rounding-control")
         print("field to 11 = truncate toward zero, so every fistp in the workers")
         print("truncates rather than rounds to nearest.")

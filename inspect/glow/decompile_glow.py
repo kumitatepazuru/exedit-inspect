@@ -1,7 +1,7 @@
 """Decompile/disassemble the 発光 (glow) filter's func_proc and its worker
 functions in exedit.auf.
 
-func_proc's address (0x10053100) was found with find_glow_addr.py. This
+func_proc's address (0x10053100) was found with `tools.filter_table --name 発光`. This
 script builds a small angr CFG rooted at that address (angr's CFGFast is run
 over a narrow byte range around the target instead of the whole binary,
 which is both much faster and avoids pulling in unrelated functions), then:
@@ -20,11 +20,10 @@ Run via main.py:
 """
 
 import argparse
-import logging
 
-import angr
-import capstone
-import pefile
+from tools.decompile import decompile_targets
+from tools.disasm import disasm_range
+from tools.pe_image import PEImage
 
 FUNC_PROC = 0x10053100
 
@@ -49,53 +48,21 @@ FP_HELPERS = {
 }
 
 
-def _build_cfg(proj, addr, span=0x2000):
-    logging.getLogger("angr").setLevel(logging.ERROR)
-    base = addr & ~0xFFF
-    return proj.analyses.CFGFast(regions=[(base, base + span)], force_complete_scan=False, normalize=True)
-
-
-def _decompile(proj, cfg, addr, label):
-    func = cfg.functions.function(addr=addr)
-    print(f"\n{'=' * 70}\n{label}  (0x{addr:08x})\n{'=' * 70}")
-    if func is None:
-        print("  ! angr did not recover a function at this address")
-        return
-    try:
-        dec = proj.analyses.Decompiler(func, cfg=cfg.model)
-        print(dec.codegen.text)
-    except Exception as e:
-        print(f"  ! decompilation failed: {e}")
-
-
-def _disasm(dll_path, addr, size, label):
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    rva = addr - image_base
-    code = data[rva:rva + size]
-    print(f"\n{'=' * 70}\n{label}  (0x{addr:08x}, raw capstone disassembly)\n{'=' * 70}")
-    for insn in md.disasm(code, addr):
-        print(f"0x{insn.address:08x}: {insn.mnemonic} {insn.op_str}")
-
-
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-workers", action="store_true", help="only decompile func_proc itself")
     args = parser.parse_args(argv or [])
 
-    proj = angr.Project(dll_path, auto_load_libs=False)
-    cfg = _build_cfg(proj, FUNC_PROC, span=0x3000)
-
     targets = {"func_proc (dispatcher)": FUNC_PROC} if args.skip_workers else WORKERS
-    for label, addr in targets.items():
-        _decompile(proj, cfg, addr, label)
+    base = FUNC_PROC & ~0xFFF
+    decompile_targets(dll_path, targets, region=(base, base + 0x3000))
 
     if not args.skip_workers:
+        img = PEImage(dll_path)
         for label, (addr, size) in FP_HELPERS.items():
-            _disasm(dll_path, addr, size, label)
+            print(f"\n{'=' * 74}\n{label}  (0x{addr:08x}, raw capstone disassembly)\n{'=' * 74}")
+            for insn, _ in disasm_range(img, addr, size, resolve=False):
+                print(f"0x{insn.address:08x}: {insn.mnemonic} {insn.op_str}")
 
 
 if __name__ == "__main__":

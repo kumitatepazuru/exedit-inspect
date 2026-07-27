@@ -20,10 +20,9 @@ Run via main.py:
 """
 
 import re
-import struct
 
-import capstone
-import pefile
+from tools.disasm import disasm_range
+from tools.pe_image import PEImage
 
 PARAM_SETUP = (0x1000E2F0, 0xE0)
 
@@ -60,27 +59,26 @@ ANNOTATIONS = {
 }
 
 
-def _const_hint(insn, image_base, data):
+def _const_hint(img, insn):
+    """Doubles behind x87 operands. Narrower than tools.disasm's resolver on
+    purpose: only x87 instructions are annotated, so the radius arithmetic
+    below is not buried under a reading of every integer operand."""
     hints = []
     for m in re.finditer(r"0x[0-9a-fA-F]{7,8}", insn.op_str):
-        addr = int(m.group(0), 16)
-        rva = addr - image_base
-        if 0 <= rva and rva + 8 <= len(data) and insn.mnemonic.startswith("f"):
-            hints.append(f"{m.group(0)} = {struct.unpack_from('<d', data, rva)[0]!r}")
+        va = int(m.group(0), 16)
+        if insn.mnemonic.startswith("f") and img.valid(va, 8):
+            hints.append(f"{m.group(0)} = {img.f64(va)!r}")
     return ("   ; " + ", ".join(hints)) if hints else ""
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    img = PEImage(dll_path)
 
     start, size = PARAM_SETUP
     print(f"--- func_proc @ 0x{start:08x}: トラックバー -> radii ---")
-    for insn in md.disasm(data[start - image_base:start - image_base + size], start):
+    for insn, _ in disasm_range(img, start, size, resolve=False):
         note = ANNOTATIONS.get(insn.address, "")
-        marker = f"    <-- {note}" if note else _const_hint(insn, image_base, data)
+        marker = f"    <-- {note}" if note else _const_hint(img, insn)
         print(f"0x{insn.address:08x}: {insn.mnemonic:8s} {insn.op_str}{marker}")
 
     magic = 0x10624DD3

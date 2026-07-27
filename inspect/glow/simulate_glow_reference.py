@@ -36,7 +36,7 @@ import argparse
 import math
 import struct
 
-import pefile
+from tools.pe_image import PEImage
 
 # Q14 BT.601 rows, same addresses verify_ycbcr_matrix.py checks.
 ROW_B, ROW_G, ROW_R = 0x100A989C, 0x100A98A4, 0x100A98AC
@@ -51,10 +51,10 @@ STRENGTH_UI_TO_RAW = 10
 THRESHOLD_UI_TO_RAW = 10
 
 
-def _matrix(data, image_base):
+def _matrix(img):
     rows = {}
     for label, va in (("B", ROW_B), ("G", ROW_G), ("R", ROW_R)):
-        rows[label] = struct.unpack_from("<3h", data, va - image_base)
+        rows[label] = struct.unpack_from("<3h", img.code(va, 6))
     return rows
 
 
@@ -274,8 +274,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
     ap.add_argument("--mode", choices=("object", "frame"), default="object")
     args = ap.parse_args(argv or [])
 
-    pe = pefile.PE(dll_path)
-    rows = _matrix(pe.get_memory_mapped_image(), pe.OPTIONAL_HEADER.ImageBase)
+    rows = _matrix(PEImage(dll_path))
 
     src_rgb = _parse_rgb(args.src)
     light_rgb = None if args.color.lower() == "none" else _parse_rgb(args.color)

@@ -27,7 +27,7 @@ Run via main.py:
 
 import struct
 
-import pefile
+from tools.pe_image import PEImage
 
 # 3 rows of (Y-weight, Cb-weight, Cr-weight), one row per input channel,
 # loaded by sub_1006f6e0/sub_1006f5b0 (see disasm_color.py's decompile of
@@ -50,20 +50,17 @@ BT601 = {
 }
 
 
-def _read_row(data, image_base, va):
-    raw = data[va - image_base: va - image_base + 6]
-    return struct.unpack_from("<3h", raw)
+def _read_row(img, va):
+    return struct.unpack_from("<3h", img.code(va, 6))
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
+    img = PEImage(dll_path)
 
     print(f"--- raw int16 rows from the RGB->YCbCr constant table (Q{SCALE.bit_length() - 1} fixed point) ---")
     rows = {}
     for label, va in [("B", ROW_B), ("G", ROW_G), ("R", ROW_R)]:
-        row = _read_row(data, image_base, va)
+        row = _read_row(img, va)
         rows[label] = row
         print(f"  {label}-channel row @ 0x{va:08x}: raw={row}  /{SCALE} = {tuple(v / SCALE for v in row)}")
 

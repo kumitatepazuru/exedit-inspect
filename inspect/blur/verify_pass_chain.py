@@ -26,8 +26,8 @@ Run via main.py:
 
 import re
 
-import capstone
-import pefile
+from tools.disasm import disasm_range, function_body
+from tools.pe_image import PEImage
 
 FUNC_PROC = (0x1000E2F0, 0x7E4)
 
@@ -82,13 +82,8 @@ PUBLISH_SITES = {
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    start, size = FUNC_PROC
-    insns = list(md.disasm(data[start - image_base:start - image_base + size], start))
+    img = PEImage(dll_path)
+    insns = [i for i, _ in disasm_range(img, *FUNC_PROC, resolve=False)]
 
     print("--- how func_proc hands each pass its radius ---")
     for insn in insns:
@@ -100,21 +95,11 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
         print(f"0x{insn.address:08x}: {write} {which:44s}"
               f"{'  <-- ' + note if note else ''}")
 
-    def body(addr):
-        """Instructions of the function at addr, stopping at the `ret` whose
-        next instruction is padding."""
-        out = []
-        for insn in md.disasm(data[addr - image_base:addr - image_base + WORKER_SCAN_LIMIT], addr):
-            if insn.mnemonic == "nop" and out and out[-1].mnemonic == "ret":
-                break
-            out.append(insn)
-        return out
-
     print("\n--- which radius/kernel globals each worker reads ---")
     print("    worker      bytes  role                            globals consumed")
     verdict = {}
     for addr, kind in WORKERS.items():
-        insns_w = body(addr)
+        insns_w = function_body(img, addr, WORKER_SCAN_LIMIT)
         length = insns_w[-1].address + insns_w[-1].size - addr
         found = set()
         for insn in insns_w:

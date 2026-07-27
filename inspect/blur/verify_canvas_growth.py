@@ -28,8 +28,9 @@ Run via main.py:
     uv run main.py inspect/blur/verify_canvas_growth.py
 """
 
-import capstone
-import pefile
+from tools.cints import c_div
+from tools.disasm import dump_range
+from tools.pe_image import PEImage
 
 EXPANSION = (0x1000E3CF, 0x116)
 
@@ -60,21 +61,16 @@ ANNOTATIONS = {
 }
 
 
-def trunc_div(a, b):
-    q = abs(a) // abs(b)
-    return q if (a < 0) == (b < 0) else -q
-
-
 def plan(w, h, rng, size_fixed, max_w=4096, max_h=4096):
     """func_proc 0x1000e364-0x1000e4e2 for the object path, in Python."""
     rx = ry = rng
     # max-canvas clamp (0x1000e367-0x1000e3a1) - applied whatever サイズ固定 is
     if w + 2 * rx > max_w:
-        rx = trunc_div(max_w - w, 2)
+        rx = c_div(max_w - w, 2)
     if h + 2 * ry > max_h:
-        ry = trunc_div(max_h - h, 2)
-    rx_hi, rx_lo = rx - trunc_div(rx, 2), trunc_div(rx, 2)
-    ry_hi, ry_lo = ry - trunc_div(ry, 2), trunc_div(ry, 2)
+        ry = c_div(max_h - h, 2)
+    rx_hi, rx_lo = rx - c_div(rx, 2), c_div(rx, 2)
+    ry_hi, ry_lo = ry - c_div(ry, 2), c_div(ry, 2)
 
     pre = False
     if not size_fixed:
@@ -93,17 +89,9 @@ def plan(w, h, rng, size_fixed, max_w=4096, max_h=4096):
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    start, size = EXPANSION
-    print("--- func_proc: the サイズ固定 test and the canvas pre-expansion ---")
-    for insn in md.disasm(data[start - image_base:start - image_base + size], start):
-        note = ANNOTATIONS.get(insn.address, "")
-        print(f"0x{insn.address:08x}: {insn.mnemonic:8s} {insn.op_str}"
-              f"{'    <-- ' + note if note else ''}")
+    dump_range(PEImage(dll_path), *EXPANSION,
+               label="func_proc: the サイズ固定 test and the canvas pre-expansion",
+               resolve=False, annotations=ANNOTATIONS)
 
     print("\n--- resulting canvas size, object path (max canvas 4096x4096) ---")
     print("    w    h  範囲 固定 |    radii    | pre-expand | workers used"

@@ -26,27 +26,16 @@ Run via main.py:
     uv run main.py inspect/boundary_blur/verify_radius_clamp.py
 """
 
-MAGIC = 0x10624DD3
+from tools.cints import MAGIC_1000, c_div, msvc_div
 
-
-def _to_signed32(v):
-    v &= 0xFFFFFFFF
-    return v - (1 << 32) if v & 0x80000000 else v
+MAGIC = MAGIC_1000
 
 
 def magic_div_1000(x):
     """The literal instruction sequence at 0x10011b26 / 0x10011b46 - identical
-    to ぼかし's (inspect/blur/verify_radius_split.py's magic_div_1000)."""
-    prod = MAGIC * x
-    edx = _to_signed32(prod >> 32)
-    edx >>= 6
-    sign = (edx & 0xFFFFFFFF) >> 31
-    return _to_signed32(edx + sign)
-
-
-def trunc_div(a, b):
-    q = abs(a) // abs(b)
-    return q if (a < 0) == (b < 0) else -q
+    to ぼかし's (inspect/blur/verify_radius_split.py's magic_div_1000), and
+    spelled out instruction by instruction in tools.cints.msvc_div."""
+    return msvc_div(x, MAGIC, 6)
 
 
 def radii(rng, aspect):
@@ -62,7 +51,7 @@ def radii(rng, aspect):
 
 def half(dim):
     """func_proc 0x10011b6c-0x10011b94: cdq/sub/sar 1 halving idiom."""
-    return trunc_div(dim, 2)
+    return c_div(dim, 2)
 
 
 def clamp_radii(rng, aspect, width, height):
@@ -85,11 +74,11 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
             else:
                 continue
             checked += 1
-            if magic_div_1000(x) != trunc_div(x, 1000):
+            if magic_div_1000(x) != c_div(x, 1000):
                 bad += 1
                 if bad <= 5:
                     print(f"  MISMATCH 範囲={rng} 縦横比={aspect}: "
-                          f"magic={magic_div_1000(x)} trunc={trunc_div(x, 1000)}")
+                          f"magic={magic_div_1000(x)} trunc={c_div(x, 1000)}")
     print(f"  checked {checked} products, {bad} mismatch(es) -> "
           f"{'exact truncating divide by 1000 (same constant as ぼかし)' if bad == 0 else 'NOT a plain divide'}")
 

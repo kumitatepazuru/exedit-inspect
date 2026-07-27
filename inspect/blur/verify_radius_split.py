@@ -19,32 +19,21 @@ Run via main.py:
     uv run main.py inspect/blur/verify_radius_split.py
 """
 
-MAGIC = 0x10624DD3
+from tools.cints import MAGIC_1000, c_div, msvc_div
 
-
-def _to_signed32(v):
-    v &= 0xFFFFFFFF
-    return v - (1 << 32) if v & 0x80000000 else v
+MAGIC = MAGIC_1000
 
 
 def magic_div_1000(x):
-    """The literal instruction sequence at 0x1000e31f / 0x1000e33f.
+    """The literal instruction sequence at 0x1000e31f / 0x1000e33f -
+    tools.cints.msvc_div spells it out instruction by instruction:
 
         mov  eax, 0x10624dd3
         imul ecx            ; edx:eax = (signed)eax * (signed)ecx
         sar  edx, 6
         mov  eax, edx / shr eax, 31 / add edx, eax
     """
-    prod = MAGIC * x                      # imul: full 64-bit signed product
-    edx = _to_signed32(prod >> 32)        # high half
-    edx >>= 6                             # sar edx, 6  (arithmetic)
-    sign = (edx & 0xFFFFFFFF) >> 31       # shr eax, 31
-    return _to_signed32(edx + sign)
-
-
-def trunc_div(a, b):
-    q = abs(a) // abs(b)
-    return q if (a < 0) == (b < 0) else -q
+    return msvc_div(x, MAGIC, 6)
 
 
 def radii(rng, aspect):
@@ -59,7 +48,7 @@ def radii(rng, aspect):
 
 def split(r):
     """func_proc 0x1000e3a3-0x1000e3c3: r -> (hi, lo) for the two box passes."""
-    lo = trunc_div(r, 2)
+    lo = c_div(r, 2)
     return r - lo, lo
 
 
@@ -89,11 +78,11 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
             else:
                 continue
             checked += 1
-            if magic_div_1000(x) != trunc_div(x, 1000):
+            if magic_div_1000(x) != c_div(x, 1000):
                 bad += 1
                 if bad <= 5:
                     print(f"  MISMATCH 範囲={rng} 縦横比={aspect}: "
-                          f"magic={magic_div_1000(x)} trunc={trunc_div(x, 1000)}")
+                          f"magic={magic_div_1000(x)} trunc={c_div(x, 1000)}")
     print(f"  checked {checked} products, {bad} mismatch(es) -> "
           f"{'exact truncating divide by 1000' if bad == 0 else 'NOT a plain divide'}")
 

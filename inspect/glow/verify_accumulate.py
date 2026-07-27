@@ -31,8 +31,8 @@ Run via main.py:
     uv run main.py inspect/glow/verify_accumulate.py
 """
 
-import capstone
-import pefile
+from tools.disasm import dump_all
+from tools.pe_image import PEImage
 
 ACCUM_FRAME = (0x100542FA, 0x70)    # sub_100540a0, diffusion speed = 0, into ycp_edit
 ACCUM_OBJECT = (0x100546FD, 0x70)   # sub_100544a0, diffusion speed = 0, into *(fpip+0xB0)
@@ -59,15 +59,6 @@ ANNOTATIONS = {
     0x10054A14: "chroma: store cb byte at accumulator+4",
     0x10054A3B: "chroma: store cr byte at accumulator+5",
 }
-
-
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n--- {label} @ 0x{start:08x} ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        note = ANNOTATIONS.get(insn.address, "")
-        marker = f"    <-- {note}" if note else ""
-        print(f"0x{insn.address:08x}: {insn.mnemonic:7s} {insn.op_str}{marker}")
 
 
 def accumulate_speed_zero(passes):
@@ -106,17 +97,11 @@ def accumulate_speed_nonzero(passes):
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    _dump(md, image_base, data, *ACCUM_FRAME,
-          "sub_100540a0 (frame filter, speed=0): saturating accumulate into ycp_edit")
-    _dump(md, image_base, data, *ACCUM_OBJECT,
-          "sub_100544a0 (object effect, speed=0): same code, accumulating into *(fpip+0xB0)")
-    _dump(md, image_base, data, *ACCUM_SPEED,
-          "sub_100548a0 (speed>0): float luma fadd + signed-byte chroma with per-pass clamp")
+    dump_all(PEImage(dll_path), {
+        "sub_100540a0 (frame filter, speed=0): saturating accumulate into ycp_edit": ACCUM_FRAME,
+        "sub_100544a0 (object effect, speed=0): same code, accumulating into *(fpip+0xB0)": ACCUM_OBJECT,
+        "sub_100548a0 (speed>0): float luma fadd + signed-byte chroma with per-pass clamp": ACCUM_SPEED,
+    }, resolve=False, annotations=ANNOTATIONS, mnemonic_width=7)
 
     print(
         "\nNumeric replay, 6 passes each contributing the same value (a stand-in for the\n"

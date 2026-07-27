@@ -31,24 +31,16 @@ Run via main.py:
     uv run main.py inspect/glow/verify_strength_threshold.py
 """
 
-MAGIC = 0x10624DD3
+from tools.cints import MAGIC_1000, msvc_div, to_i32
 
-
-def _to_signed32(x: int) -> int:
-    x &= 0xFFFFFFFF
-    return x - 0x100000000 if x >= 0x80000000 else x
+MAGIC = MAGIC_1000
 
 
 def magic_divide_by_1000(raw: int) -> int:
     """Re-implements: shl ecx,0xc / mov eax,MAGIC / imul ecx / sar edx,6 /
-    mov ecx,edx / shr ecx,0x1f / add edx,ecx  (see 0x10053115.. in disasm_params.py)."""
-    ecx = _to_signed32(raw << 12)
-    magic_signed = _to_signed32(MAGIC)
-    product = magic_signed * ecx  # true integer product, no overflow in Python
-    edx = _to_signed32((product & 0xFFFFFFFFFFFFFFFF) >> 32)
-    edx >>= 6  # arithmetic shift (Python's >> on an int is already arithmetic)
-    sign_bit = (edx & 0xFFFFFFFF) >> 31
-    return edx + sign_bit
+    mov ecx,edx / shr ecx,0x1f / add edx,ecx  (see 0x10053115.. in disasm_params.py).
+    Everything after the shift is tools.cints.msvc_div."""
+    return msvc_div(to_i32(raw << 12), MAGIC, 6)
 
 
 def strength_gain_and_overflow(raw_strength: int) -> tuple[int, int]:

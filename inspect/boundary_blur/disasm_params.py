@@ -27,8 +27,8 @@ Run via main.py:
     uv run main.py inspect/boundary_blur/disasm_params.py
 """
 
-import capstone
-import pefile
+from tools.disasm import dump_range
+from tools.pe_image import PEImage
 
 FUNC_PROC = (0x10011B00, 0x126)
 
@@ -76,17 +76,9 @@ ANNOTATIONS = {
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    start, size = FUNC_PROC
-    print(f"--- func_proc @ 0x{start:08x}: トラックバー -> radii -> worker dispatch ---")
-    for insn in md.disasm(data[start - image_base:start - image_base + size], start):
-        note = ANNOTATIONS.get(insn.address, "")
-        marker = f"    <-- {note}" if note else ""
-        print(f"0x{insn.address:08x}: {insn.mnemonic:8s} {insn.op_str}{marker}")
+    dump_range(PEImage(dll_path), *FUNC_PROC,
+               label="func_proc: トラックバー -> radii -> worker dispatch",
+               resolve=False, annotations=ANNOTATIONS)
 
     magic = 0x10624DD3
     print(

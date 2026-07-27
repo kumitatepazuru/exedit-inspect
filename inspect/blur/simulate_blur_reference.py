@@ -26,6 +26,8 @@ import argparse
 import math
 import struct
 
+from tools.cints import c_div
+
 MAX_W = MAX_H = 4096
 
 
@@ -33,15 +35,10 @@ def f32(x):
     return struct.unpack("<f", struct.pack("<f", x))[0]
 
 
-def trunc_div(a, b):
-    q = abs(a) // abs(b)
-    return q if (a < 0) == (b < 0) else -q
-
-
 def round_half_away(num, den):
     """`if (x < 0) x -= den/2; else x += den/2; x /= den` - the chroma divides."""
-    half = trunc_div(den, 2)
-    return trunc_div(num - half if num < 0 else num + half, den)
+    half = c_div(den, 2)
+    return c_div(num - half if num < 0 else num + half, den)
 
 
 # --------------------------------------------------------------------------
@@ -71,7 +68,7 @@ class ObjectAcc:
         self.a += sign * a
 
     def emit(self, divisor):
-        alpha = trunc_div(self.a, divisor)
+        alpha = c_div(self.a, divisor)
         if self.a == 0:
             # 0x1000ebec: the colour stores are skipped entirely, so the
             # destination keeps whatever the ping-pong buffer already held.
@@ -112,8 +109,8 @@ class FrameAcc:
                     max(-128, min(127, round_half_away(self.cb, divisor))),
                     max(-128, min(127, round_half_away(self.cr, divisor))),
                     None)
-        return (trunc_div(self.y, divisor), trunc_div(self.cb, divisor),
-                trunc_div(self.cr, divisor), None)
+        return (c_div(self.y, divisor), c_div(self.cb, divisor),
+                c_div(self.cr, divisor), None)
 
 
 def line_pass(src, radius, grow, object_mode, curved):
@@ -239,18 +236,18 @@ def blur(img, rng, aspect, light, size_fixed, object_mode):
         return img
     rx = ry = rng
     if aspect > 0:
-        ry = trunc_div((1000 - aspect) * rng, 1000)
+        ry = c_div((1000 - aspect) * rng, 1000)
     elif aspect < 0:
-        rx = trunc_div((1000 + aspect) * rng, 1000)
+        rx = c_div((1000 + aspect) * rng, 1000)
 
     if object_mode:
         if img.w + 2 * rx > MAX_W:
-            rx = trunc_div(MAX_W - img.w, 2)
+            rx = c_div(MAX_W - img.w, 2)
         if img.h + 2 * ry > MAX_H:
-            ry = trunc_div(MAX_H - img.h, 2)
+            ry = c_div(MAX_H - img.h, 2)
 
-    rx_hi, rx_lo = rx - trunc_div(rx, 2), trunc_div(rx, 2)
-    ry_hi, ry_lo = ry - trunc_div(ry, 2), trunc_div(ry, 2)
+    rx_hi, rx_lo = rx - c_div(rx, 2), c_div(rx, 2)
+    ry_hi, ry_lo = ry - c_div(ry, 2), c_div(ry, 2)
 
     if object_mode:
         if not size_fixed and (2 * rx_hi >= img.w or 2 * ry_hi >= img.h
@@ -264,13 +261,13 @@ def blur(img, rng, aspect, light, size_fixed, object_mode):
             size_fixed = 1                         # 0x1000e45c
     else:
         if 2 * rx_hi > img.w:
-            rx_hi = trunc_div(img.w, 2)
+            rx_hi = c_div(img.w, 2)
         if 2 * ry_hi > img.h:
-            ry_hi = trunc_div(img.h, 2)
+            ry_hi = c_div(img.h, 2)
         if 2 * rx_lo > img.w:
-            rx_lo = trunc_div(img.w, 2)
+            rx_lo = c_div(img.w, 2)
         if 2 * ry_lo > img.h:
-            ry_lo = trunc_div(img.h, 2)
+            ry_lo = c_div(img.h, 2)
         size_fixed = 1                             # a frame never grows
 
     curved = light > 0

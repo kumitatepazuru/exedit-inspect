@@ -41,10 +41,9 @@ Run via main.py:
 """
 
 import re
-import struct
 
-import capstone
-import pefile
+from tools.disasm import disasm_range, dump_all
+from tools.pe_image import PEImage
 
 DISPATCHER = (0x10053A30, 0xE0)
 PASS1_VERTICAL = (0x10053B10, 0xB0)          # ycp_temp -> global scratch
@@ -65,39 +64,28 @@ GLOBALS = {
 }
 
 
-def _annotate(insn):
+def annotate(insn):
     for addr, name in GLOBALS.items():
         if f"0x{addr:08x}" in insn.op_str:
-            return f"    <-- {name}"
+            return name
     if "[ecx + 8]" in insn.op_str or "[edx + 8]" in insn.op_str or "[eax + 8]" in insn.op_str:
-        return "    <-- fpip->ycp_temp (offset +8)"
+        return "fpip->ycp_temp (offset +8)"
     if insn.mnemonic == "idiv":
-        return "    <-- divide the window sum by the kernel width (box average)"
+        return "divide the window sum by the kernel width (box average)"
     return ""
 
 
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n--- {label} @ 0x{start:08x} ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        print(f"0x{insn.address:08x}: {insn.mnemonic:7s} {insn.op_str}{_annotate(insn)}")
-
-
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    _dump(md, image_base, data, *DISPATCHER,
-          "sub_10053a30 (per-pass dispatcher: clamps the radius per direction, "
-          "picks the worker pair)")
-    _dump(md, image_base, data, *PASS1_VERTICAL,
-          "sub_10053b10 (step 1, VERTICAL: ycp_temp -> scratch)")
-    _dump(md, image_base, data, *PASS2_HORIZONTAL_FRAME,
-          "sub_100540a0 (step 2, HORIZONTAL, frame filter: scratch -> ycp_temp + accumulate)")
-    _dump(md, image_base, data, *PASS2_HORIZONTAL_OBJECT,
-          "sub_100544a0 (step 2, HORIZONTAL, object effect: scratch -> ycp_temp + accumulate)")
+    img = PEImage(dll_path)
+    dump_all(img, {
+        "sub_10053a30 (per-pass dispatcher: clamps the radius per direction, "
+        "picks the worker pair)": DISPATCHER,
+        "sub_10053b10 (step 1, VERTICAL: ycp_temp -> scratch)": PASS1_VERTICAL,
+        "sub_100540a0 (step 2, HORIZONTAL, frame filter: scratch -> ycp_temp + accumulate)":
+            PASS2_HORIZONTAL_FRAME,
+        "sub_100544a0 (step 2, HORIZONTAL, object effect: scratch -> ycp_temp + accumulate)":
+            PASS2_HORIZONTAL_OBJECT,
+    }, resolve=False, annotations=annotate, mnemonic_width=7)
 
     print("\n--- which radius/kernel globals each worker actually reads ---")
     for start, size, name in ((0x10053B10, 0x300, "sub_10053b10  (step 1, speed=0)"),
@@ -106,7 +94,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
                               (0x10053DA0, 0x300, "sub_10053da0  (step 1, speed>0)"),
                               (0x100548A0, 0x220, "sub_100548a0  (step 2, speed>0)")):
         found = set()
-        for insn in md.disasm(data[start - image_base:start - image_base + size], start):
+        for insn, _ in disasm_range(img, start, size, resolve=False):
             for m in re.finditer(r"0x101b1f(?:e8|ec|f0|f8)", insn.op_str):
                 found.add(m.group(0))
         tags = ", ".join(f"{g} ({GLOBALS[int(g, 16)]})" for g in sorted(found))

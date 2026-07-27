@@ -37,8 +37,8 @@ Run via main.py:
     uv run main.py inspect/blur/verify_mode_mapping.py
 """
 
-import capstone
-import pefile
+from tools.disasm import disasm_range, dump_range
+from tools.pe_image import PEImage
 
 FUNC_PROC = (0x1000E2F0, 0x7E4)
 MODE_BRANCH = (0x1000E355, 0x1F0)
@@ -79,21 +79,13 @@ MT_CALL = "dword ptr [ecx + 0xcc]", "dword ptr [edx + 0xcc]", "dword ptr [eax + 
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    start, size = MODE_BRANCH
-    print(f"--- func_proc @ 0x{start:08x}: the flag&0x20 branch and what it selects ---")
-    for insn in md.disasm(data[start - image_base:start - image_base + size], start):
-        note = ANNOTATIONS.get(insn.address, "")
-        print(f"0x{insn.address:08x}: {insn.mnemonic:8s} {insn.op_str}"
-              f"{'    <-- ' + note if note else ''}")
+    img = PEImage(dll_path)
+    dump_range(img, *MODE_BRANCH,
+               label="func_proc: the flag&0x20 branch and what it selects",
+               resolve=False, annotations=ANNOTATIONS)
 
     # --- recover the worker dispatch table straight out of func_proc ---
-    start, size = FUNC_PROC
-    insns = list(md.disasm(data[start - image_base:start - image_base + size], start))
+    insns = [i for i, _ in disasm_range(img, *FUNC_PROC, resolve=False)]
     index_of = {ins.address: k for k, ins in enumerate(insns)}
 
     # Every `test .. / je T` in this function guards exactly one dispatch pair:

@@ -31,11 +31,9 @@ Run via main.py:
 """
 
 import math
-import re
-import struct
 
-import capstone
-import pefile
+from tools.disasm import dump_all
+from tools.pe_image import PEImage
 
 FORWARD_WORKER = (0x10070640, 0xA0)   # per-pixel body of sub_100705c0
 INVERSE_WORKER = (0x100707EB, 0x40)   # per-pixel body of sub_10070780
@@ -66,36 +64,11 @@ ANNOTATIONS = {
 }
 
 
-def _const(insn, image_base, data):
-    m = re.search(r"\[(0x[0-9a-fA-F]{7,8})\]", insn.op_str)
-    if not m:
-        return ""
-    rva = int(m.group(1), 16) - image_base
-    if rva < 0 or rva + 8 > len(data):
-        return ""
-    f32 = struct.unpack_from("<f", data, rva)[0]
-    f64 = struct.unpack_from("<d", data, rva)[0]
-    return f"  ; f32={f32:g} f64={f64:g}"
-
-
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n--- {label} @ 0x{start:08x} ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        note = ANNOTATIONS.get(insn.address, "")
-        marker = f"    <-- {note}" if note else ""
-        print(f"0x{insn.address:08x}: {insn.mnemonic:7s} {insn.op_str}"
-              f"{_const(insn, image_base, data)}{marker}")
-
-
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    _dump(md, image_base, data, *FORWARD_WORKER, "sub_100705c0 per-pixel body (forward curve)")
-    _dump(md, image_base, data, *INVERSE_WORKER, "sub_10070780 per-pixel body (inverse curve)")
+    dump_all(PEImage(dll_path), {
+        "sub_100705c0 per-pixel body (forward curve)": FORWARD_WORKER,
+        "sub_10070780 per-pixel body (inverse curve)": INVERSE_WORKER,
+    }, annotations=ANNOTATIONS, mnemonic_width=7)
 
     print(
         "\nWhat the two clamps do to a real case (light color #f00, strength 60,\n"

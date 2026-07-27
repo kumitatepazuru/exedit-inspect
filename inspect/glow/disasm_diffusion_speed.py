@@ -25,11 +25,8 @@ Run via main.py:
     uv run main.py inspect/glow/disasm_diffusion_speed.py
 """
 
-import re
-import struct
-
-import capstone
-import pefile
+from tools.disasm import dump_all
+from tools.pe_image import PEImage
 
 # forward transform: runs once over the glow buffer BEFORE the 6-pass blur
 FORWARD_ENTRY = (0x10070550, 0x60)   # clamps 拡散速度 to [1,100], computes base = 1 + speed*0.001
@@ -40,36 +37,13 @@ INVERSE_ENTRY = (0x10070700, 0x80)    # same clamp; computes 1/ln(base)
 INVERSE_WORKER = (0x10070780, 0x160)  # per-pixel: y = round(16 * ln(curved+1) / ln(base)); chroma <<4
 
 
-def _resolve_const(insn, image_base, data):
-    m = re.search(r"0x[0-9a-fA-F]{7,8}\]", insn.op_str)
-    if not m:
-        return ""
-    addr = int(m.group(0)[:-1], 16)
-    rva = addr - image_base
-    if rva < 0 or rva + 8 > len(data):
-        return ""
-    f64 = struct.unpack_from("<d", data, rva)[0]
-    i32 = struct.unpack_from("<i", data, rva)[0]
-    return f"  ; f64={f64!r} i32={i32}"
-
-
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n--- {label} @ 0x{start:08x} ({size} bytes) ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        print(f"0x{insn.address:08x}: {insn.mnemonic} {insn.op_str}{_resolve_const(insn, image_base, data)}")
-
-
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    _dump(md, image_base, data, *FORWARD_ENTRY, "forward transform entry (clamp + base = 1+speed*0.001)")
-    _dump(md, image_base, data, *FORWARD_WORKER, "forward transform worker (curved = pow(base, y/16) - 1)")
-    _dump(md, image_base, data, *INVERSE_ENTRY, "inverse transform entry (clamp + 1/ln(base))")
-    _dump(md, image_base, data, *INVERSE_WORKER, "inverse transform worker (y = 16*log_base(curved+1))")
+    dump_all(PEImage(dll_path), {
+        "forward transform entry (clamp + base = 1+speed*0.001)": FORWARD_ENTRY,
+        "forward transform worker (curved = pow(base, y/16) - 1)": FORWARD_WORKER,
+        "inverse transform entry (clamp + 1/ln(base))": INVERSE_ENTRY,
+        "inverse transform worker (y = 16*log_base(curved+1))": INVERSE_WORKER,
+    })
 
     print(
         "\n"

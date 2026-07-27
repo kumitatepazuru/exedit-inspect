@@ -29,14 +29,11 @@ Run via main.py:
 """
 
 import logging
-import struct
 
 import angr
-import pefile
 
-GLOW_STRUCT_VA = 0x100A6218  # object-effect FILTER_DLL entry (flag=0x20), from find_glow_addr.py
-OFF_EX_DATA_SIZE = 0x50
-OFF_EX_DATA_DEF = 0x6C
+from tools.filter_table import find
+from tools.pe_image import PEImage
 
 # frame-filter bright-pass extraction workers: one uses the source pixel's
 # own chroma (natural color), the other uses a fixed tint derived from the
@@ -47,16 +44,13 @@ COLOR_CONVERT_WORKER = 0x1006F520
 
 
 def _dump_ex_data_def(dll_path):
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-
-    def rd(va):
-        return struct.unpack_from("<I", data, va - image_base)[0]
-
-    size = rd(GLOW_STRUCT_VA + OFF_EX_DATA_SIZE)
-    def_ptr = rd(GLOW_STRUCT_VA + OFF_EX_DATA_DEF)
-    raw = rd(def_ptr)
+    # tools.filter_table already decodes ex_data_size / ex_data_def for every
+    # registration; take the object-effect entry (the first of 発光's two - they
+    # share one ex_data_def pointer anyway).
+    reg = find(PEImage(dll_path), "発光")[0]
+    size = reg.ex_data_size
+    def_ptr = reg.ex_data_def
+    raw = int.from_bytes(reg.ex_data_def_bytes[:4], "little")
     print(f"ex_data_size = {size} bytes, ex_data_def @ 0x{def_ptr:08x}")
     print(f"default ex_data dword = 0x{raw:08x}")
     print(f"  bit24 (0x1000000)  = {'set' if raw & 0x1000000 else 'clear'}  (selects natural-vs-tint below)")

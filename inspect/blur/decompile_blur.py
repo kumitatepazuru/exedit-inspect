@@ -1,7 +1,7 @@
 """Decompile/disassemble the ぼかし (blur) filter's func_proc and the twelve
 box-blur workers it dispatches, in exedit.auf.
 
-func_proc's address (0x1000e2f0) came from find_blur_addr.py. This script
+func_proc's address (0x1000e2f0) came from `tools.filter_table --name ぼかし`. This script
 builds a small angr CFG over a narrow byte range around it (much faster than
 a whole-binary CFG, and it avoids dragging in unrelated functions), then runs
 angr's Decompiler on func_proc and on each worker.
@@ -29,11 +29,10 @@ Run via main.py:
 """
 
 import argparse
-import logging
 
-import angr
-import capstone
-import pefile
+from tools.decompile import decompile_targets
+from tools.disasm import disasm_range
+from tools.pe_image import PEImage
 
 FUNC_PROC = 0x1000E2F0
 
@@ -73,50 +72,22 @@ CANVAS_HELPERS = {
 }
 
 
-def _build_cfg(proj, addr, span):
-    logging.getLogger("angr").setLevel(logging.ERROR)
-    base = addr & ~0xFFF
-    return proj.analyses.CFGFast(regions=[(base, base + span)], force_complete_scan=False, normalize=True)
-
-
-def _decompile(proj, cfg, addr, label):
-    print(f"\n{'=' * 74}\n{label}  (0x{addr:08x})\n{'=' * 74}")
-    func = cfg.functions.function(addr=addr)
-    if func is None:
-        print("  ! angr did not recover a function at this address")
-        return
-    try:
-        print(proj.analyses.Decompiler(func, cfg=cfg.model).codegen.text)
-    except Exception as e:
-        print(f"  ! decompilation failed: {e}")
-
-
-def _disasm(image_base, data, md, addr, size, label):
-    print(f"\n{'=' * 74}\n{label}  (0x{addr:08x}, raw capstone disassembly)\n{'=' * 74}")
-    for insn in md.disasm(data[addr - image_base:addr - image_base + size], addr):
-        print(f"0x{insn.address:08x}: {insn.mnemonic:8s} {insn.op_str}")
-
-
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-workers", action="store_true", help="only decompile func_proc itself")
     args = parser.parse_args(argv or [])
 
-    proj = angr.Project(dll_path, auto_load_libs=False)
-    # func_proc at 0x1000e2f0 through the last worker at 0x100116d0
-    cfg = _build_cfg(proj, FUNC_PROC, span=0x4000)
-
     targets = {"func_proc (dispatcher)": FUNC_PROC} if args.skip_workers else WORKERS
-    for label, addr in targets.items():
-        _decompile(proj, cfg, addr, label)
+    # func_proc at 0x1000e2f0 through the last worker at 0x100116d0
+    base = FUNC_PROC & ~0xFFF
+    decompile_targets(dll_path, targets, region=(base, base + 0x4000))
 
     if not args.skip_workers:
-        pe = pefile.PE(dll_path)
-        image_base = pe.OPTIONAL_HEADER.ImageBase
-        data = pe.get_memory_mapped_image()
-        md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+        img = PEImage(dll_path)
         for label, (addr, size) in {**CURVE_HELPERS, **CANVAS_HELPERS}.items():
-            _disasm(image_base, data, md, addr, size, label)
+            print(f"\n{'=' * 74}\n{label}  (0x{addr:08x}, raw capstone disassembly)\n{'=' * 74}")
+            for insn, _ in disasm_range(img, addr, size, resolve=False):
+                print(f"0x{insn.address:08x}: {insn.mnemonic:8s} {insn.op_str}")
 
 
 if __name__ == "__main__":

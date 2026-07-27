@@ -19,28 +19,16 @@ Run via main.py:
 import argparse
 import math
 
-MAGIC = 0x10624DD3
+from tools.cints import MAGIC_1000, c_div, msvc_div
+
+MAGIC = MAGIC_1000
 C1 = math.pi / 4096
 C2 = 2048.0
 EASE_TABLE = [math.trunc(C2 * (1 - math.cos(i * C1))) for i in range(4097)]
 
 
-def _to_signed32(v):
-    v &= 0xFFFFFFFF
-    return v - (1 << 32) if v & 0x80000000 else v
-
-
 def magic_div_1000(x):
-    prod = MAGIC * x
-    edx = _to_signed32(prod >> 32)
-    edx >>= 6
-    sign = (edx & 0xFFFFFFFF) >> 31
-    return _to_signed32(edx + sign)
-
-
-def trunc_div(a, b):
-    q = abs(a) // abs(b)
-    return q if (a < 0) == (b < 0) else -q
+    return msvc_div(x, MAGIC, 6)
 
 
 def radii(rng, aspect, width, height):
@@ -50,8 +38,8 @@ def radii(rng, aspect, width, height):
         ry = magic_div_1000((1000 - aspect) * rng)
     elif aspect < 0:
         rx = magic_div_1000((1000 + aspect) * rng)
-    rx = min(rx, trunc_div(width, 2))
-    ry = min(ry, trunc_div(height, 2))
+    rx = min(rx, c_div(width, 2))
+    ry = min(ry, c_div(height, 2))
     return rx, ry
 
 

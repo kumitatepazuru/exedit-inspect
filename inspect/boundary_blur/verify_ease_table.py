@@ -40,19 +40,13 @@ Run via main.py:
 """
 
 import math
-import struct
 
-import pefile
+from tools.pe_image import PEImage
 
 C1_VA = 0x1009A758  # pi/4096
 C2_VA = 0x1009A4F8  # 2048.0
 TABLE_LO = 0x101DCF78  # table[0]
 TABLE_HI = 0x101DEF78  # claimed to be table[4096]
-
-
-def _to_signed32(v):
-    v &= 0xFFFFFFFF
-    return v - (1 << 32) if v & 0x80000000 else v
 
 
 def trunc_double_to_int(x):
@@ -67,12 +61,11 @@ def ease(i, c1, c2):
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
+    img = PEImage(dll_path)
+    image_base = img.image_base
 
     data_raw_end = None
-    for s in pe.sections:
+    for s in img.pe.sections:
         name = s.Name.decode(errors="replace").strip("\x00")
         va0 = image_base + s.VirtualAddress
         va1 = va0 + s.Misc_VirtualSize
@@ -83,8 +76,8 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
     print(f"  table target 0x{TABLE_LO:08x} is {'PAST' if TABLE_LO >= data_raw_end else 'inside'} "
           f"the raw file image for its section -> runtime-initialized, not a static const array")
 
-    c1 = struct.unpack_from("<d", data, C1_VA - image_base)[0]
-    c2 = struct.unpack_from("<d", data, C2_VA - image_base)[0]
+    c1 = img.f64(C1_VA)
+    c2 = img.f64(C2_VA)
     print(f"\n--- constants read directly from .rdata ---")
     print(f"  0x{C1_VA:08x} = {c1!r}   (pi/4096 = {math.pi / 4096!r}, exact match: {c1 == math.pi / 4096})")
     print(f"  0x{C2_VA:08x} = {c2!r}   (exactly 2048.0: {c2 == 2048.0})")

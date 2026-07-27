@@ -30,8 +30,8 @@ Run via main.py:
     uv run main.py inspect/glow/verify_extract_alpha.py
 """
 
-import capstone
-import pefile
+from tools.disasm import dump_all
+from tools.pe_image import PEImage
 
 # object-effect pair: source is *(fpip+0xAC), 8 bytes/pixel, alpha at +6
 EXTRACT_OBJECT_SRC_COLOR = (0x10053639, 0x70)   # bit24 SET: keep the source pixel's chroma
@@ -49,39 +49,36 @@ GLOBALS = {
 }
 
 
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n--- {label} @ 0x{start:08x} ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        marker = ""
-        for addr, name in GLOBALS.items():
-            if f"0x{addr:08x}" in insn.op_str:
-                marker = f"    <-- {name}"
-        if insn.mnemonic == "movsx" and "+ 6]" in insn.op_str:
-            marker = "    <-- src.a (PIXEL_YCA alpha, offset +6)"
-        elif insn.mnemonic == "imul" and not marker:
-            marker = "    <-- fixed-point multiply (result is >> 12'd next)"
-        elif insn.mnemonic == "cmp" and "0x1000" in insn.op_str:
-            marker = "    <-- clamp brightness at 4096"
-        elif insn.mnemonic == "add" and insn.op_str in ("edi, 8", "edx, 8"):
-            marker = "    <-- advance source by 8 bytes = PIXEL_YCA stride"
-        elif insn.mnemonic == "add" and insn.op_str in ("edi, 6", "ecx, 6"):
-            marker = "    <-- advance by 6 bytes = PIXEL_YC stride"
-        print(f"0x{insn.address:08x}: {insn.mnemonic:7s} {insn.op_str}{marker}")
+def annotate(insn):
+    """Annotated by instruction shape: the asymmetry this script is about -
+    luminance weighted by alpha, chroma not - shows up as which multiplies
+    appear, so a per-address list would beg the question."""
+    note = ""
+    for addr, name in GLOBALS.items():
+        if f"0x{addr:08x}" in insn.op_str:
+            note = name
+    if insn.mnemonic == "movsx" and "+ 6]" in insn.op_str:
+        return "src.a (PIXEL_YCA alpha, offset +6)"
+    if insn.mnemonic == "imul" and not note:
+        return "fixed-point multiply (result is >> 12'd next)"
+    if insn.mnemonic == "cmp" and "0x1000" in insn.op_str:
+        return "clamp brightness at 4096"
+    if insn.mnemonic == "add" and insn.op_str in ("edi, 8", "edx, 8"):
+        return "advance source by 8 bytes = PIXEL_YCA stride"
+    if insn.mnemonic == "add" and insn.op_str in ("edi, 6", "ecx, 6"):
+        return "advance by 6 bytes = PIXEL_YC stride"
+    return note
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    _dump(md, image_base, data, *EXTRACT_OBJECT_SRC_COLOR,
-          "sub_100535a0 inner loop (object effect, bit24 SET: source chroma)")
-    _dump(md, image_base, data, *EXTRACT_OBJECT_PICKED,
-          "sub_100536d0 inner loop (object effect, bit24 CLEAR: picked light color)")
-    _dump(md, image_base, data, *EXTRACT_FRAME_SRC_COLOR,
-          "sub_100533c0 inner loop (frame filter, bit24 SET: source chroma)")
+    dump_all(PEImage(dll_path), {
+        "sub_100535a0 inner loop (object effect, bit24 SET: source chroma)":
+            EXTRACT_OBJECT_SRC_COLOR,
+        "sub_100536d0 inner loop (object effect, bit24 CLEAR: picked light color)":
+            EXTRACT_OBJECT_PICKED,
+        "sub_100533c0 inner loop (frame filter, bit24 SET: source chroma)":
+            EXTRACT_FRAME_SRC_COLOR,
+    }, resolve=False, annotations=annotate, mnemonic_width=7)
 
     print(
         "\n"

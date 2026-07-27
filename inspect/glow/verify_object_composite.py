@@ -37,8 +37,8 @@ Run via main.py:
     uv run main.py inspect/glow/verify_object_composite.py
 """
 
-import capstone
-import pefile
+from tools.disasm import dump_all
+from tools.pe_image import PEImage
 
 COMPOSITE_OBJECT = (0x10053890, 0x1A0)
 COMPOSITE_FRAME = (0x10053800, 0x90)
@@ -62,25 +62,11 @@ ANNOTATIONS = {
 }
 
 
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n--- {label} @ 0x{start:08x} ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        note = ANNOTATIONS.get(insn.address, "")
-        marker = f"    <-- {note}" if note else ""
-        print(f"0x{insn.address:08x}: {insn.mnemonic:7s} {insn.op_str}{marker}")
-
-
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    _dump(md, image_base, data, *COMPOSITE_OBJECT,
-          "sub_10053890 (object effect: alpha-aware composite onto *(fpip+0xAC))")
-    _dump(md, image_base, data, *COMPOSITE_FRAME,
-          "sub_10053800 (frame filter: plain add into fpip->ycp_edit)")
+    dump_all(PEImage(dll_path), {
+        "sub_10053890 (object effect: alpha-aware composite onto *(fpip+0xAC))": COMPOSITE_OBJECT,
+        "sub_10053800 (frame filter: plain add into fpip->ycp_edit)": COMPOSITE_FRAME,
+    }, resolve=False, annotations=ANNOTATIONS, mnemonic_width=7)
 
     print(
         "\n"

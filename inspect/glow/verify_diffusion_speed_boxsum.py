@@ -25,10 +25,9 @@ Run via main.py:
 """
 
 import re
-import struct
 
-import capstone
-import pefile
+from tools.disasm import dump_all
+from tools.pe_image import PEImage
 
 VERTICAL_REDUCED = (0x10053DA0, 0x200)    # reduced-precision vertical box-sum, 拡散速度>0
 HORIZONTAL_REDUCED = (0x100548A0, 0x1E0)  # reduced-precision horizontal box-sum, 拡散速度>0
@@ -37,41 +36,29 @@ ACCUM_INIT_CONST = 0x1009A420  # 0.0f - float accumulator seed
 RECIPROCAL_ONE_CONST = 0x1009A424  # 1.0f - numerator for fdivr(kernel_width) -> 1/kernel_width
 
 
-def _resolve_const(insn, image_base, data):
+def annotate(insn):
+    """Every averaging site in these two workers, by shape rather than by
+    address - the point of the script is that there is no weighted kernel
+    anywhere in the range, which only a rule can establish."""
     m = re.search(r"0x[0-9a-fA-F]{7,8}\]", insn.op_str)
-    if not m:
-        return ""
-    addr = int(m.group(0)[:-1], 16)
-    rva = addr - image_base
-    if rva < 0 or rva + 4 > len(data):
-        return ""
-    if addr == ACCUM_INIT_CONST:
-        return "  <-- f32=0.0 (float accumulator seed)"
-    if addr == RECIPROCAL_ONE_CONST:
-        return "  <-- f32=1.0 (fdivr computes 1.0/kernel_width)"
+    if m:
+        addr = int(m.group(0)[:-1], 16)
+        if addr == ACCUM_INIT_CONST:
+            return "f32=0.0 (float accumulator seed)"
+        if addr == RECIPROCAL_ONE_CONST:
+            return "f32=1.0 (fdivr computes 1.0/kernel_width)"
+    if insn.mnemonic in ("idiv", "div"):
+        return "divide by kernel width (box average)"
+    if insn.mnemonic == "fmul" and "st(2)" in insn.op_str:
+        return "multiply running sum by 1/kernel_width (float box average)"
     return ""
 
 
-def _dump(md, image_base, data, start, size, label):
-    print(f"\n--- {label} @ 0x{start:08x} ---")
-    code = data[start - image_base:start - image_base + size]
-    for insn in md.disasm(code, start):
-        marker = ""
-        if insn.mnemonic in ("idiv", "div"):
-            marker = "  <-- divide by kernel width (box average)"
-        elif insn.mnemonic == "fmul" and "st(2)" in insn.op_str:
-            marker = "  <-- multiply running sum by 1/kernel_width (float box average)"
-        print(f"0x{insn.address:08x}: {insn.mnemonic} {insn.op_str}{_resolve_const(insn, image_base, data)}{marker}")
-
-
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
-
-    _dump(md, image_base, data, *VERTICAL_REDUCED, "sub_10053da0 (reduced-precision vertical box-sum, diffusion speed > 0)")
-    _dump(md, image_base, data, *HORIZONTAL_REDUCED, "sub_100548a0 (reduced-precision horizontal box-sum, diffusion speed > 0)")
+    dump_all(PEImage(dll_path), {
+        "sub_10053da0 (reduced-precision vertical box-sum, diffusion speed > 0)": VERTICAL_REDUCED,
+        "sub_100548a0 (reduced-precision horizontal box-sum, diffusion speed > 0)": HORIZONTAL_REDUCED,
+    }, resolve=False, annotations=annotate)
 
     print(
         "\n"

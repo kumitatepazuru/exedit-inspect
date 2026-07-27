@@ -36,10 +36,9 @@ Run via main.py:
 """
 
 import re
-import struct
 
-import capstone
-import pefile
+from tools.disasm import disasm_range
+from tools.pe_image import PEImage
 
 BLOCKS = [
     (0x10070220, 0x60, "forward curve, entry (object 8-byte buffer)"),
@@ -104,33 +103,35 @@ ANNOTATIONS = {
 }
 
 
-def _fp_hint(insn, image_base, data):
+def _fp_hint(img, insn):
+    """x87 operand -> the constant it loads, at the width the opcode uses.
+
+    Deliberately narrower than tools.disasm's generic resolver: an `fld dword`
+    is a float32 and printing the int32 or float64 reading of the same bytes
+    next to it (which the generic resolver does) is noise here, where the whole
+    point is the exact curve constant.
+    """
     if not insn.mnemonic.startswith("f"):
         return ""
     m = re.search(r"\[(0x[0-9a-fA-F]{7,8})\]", insn.op_str)
     if not m:
         return ""
-    rva = int(m.group(1), 16) - image_base
-    if rva < 0 or rva + 8 > len(data):
-        return ""
-    if "qword" in insn.op_str:
-        return f"   ; = {struct.unpack_from('<d', data, rva)[0]!r}"
-    if "dword" in insn.op_str:
-        return f"   ; = {struct.unpack_from('<f', data, rva)[0]!r}f"
+    va = int(m.group(1), 16)
+    if "qword" in insn.op_str and img.valid(va, 8):
+        return f"   ; = {img.f64(va)!r}"
+    if "dword" in insn.op_str and img.valid(va, 4):
+        return f"   ; = {img.f32(va)!r}f"
     return ""
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    pe = pefile.PE(dll_path)
-    image_base = pe.OPTIONAL_HEADER.ImageBase
-    data = pe.get_memory_mapped_image()
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    img = PEImage(dll_path)
 
     for start, size, label in BLOCKS:
         print(f"\n--- {label} @ 0x{start:08x} ---")
-        for insn in md.disasm(data[start - image_base:start - image_base + size], start):
+        for insn, _ in disasm_range(img, start, size, resolve=False):
             note = ANNOTATIONS.get(insn.address)
-            tail = f"    <-- {note}" if note else _fp_hint(insn, image_base, data)
+            tail = f"    <-- {note}" if note else _fp_hint(img, insn)
             print(f"0x{insn.address:08x}: {insn.mnemonic:8s} {insn.op_str}{tail}")
 
     print(
