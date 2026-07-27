@@ -2,7 +2,7 @@
 filter) uses, by reading the coefficient table out of .rdata.
 
 disasm_color.py locates `sub_1006f520` (dispatching into the SIMD workers
-`sub_1006f6e0`/`sub_1006f5b0`) as the shared, non-glow-specific RGB->YCbCr
+`sub_1006f6e0`/`sub_1006f5b0`) as the shared, non-luminous-specific RGB->YCbCr
 conversion exedit applies to the picked 光色, but only qualitatively - the
 coefficients themselves cannot be read out of angr's output because the
 workers are hand-written MMX/SSE code the decompiler lifts into opaque
@@ -18,11 +18,11 @@ for display, a call site that lives in aviutl.exe and so is outside this
 analysis's reach) carries the classic asymmetric cross terms: Cb feeds B
 with weight 1.772 while Cr feeds G with only -0.714136. G and B are
 therefore never supposed to move by the same amount for a red tint, which
-is why a strongly chroma-clamped red glow reads as yellow rather than as an
+is why a strongly chroma-clamped red luminous reads as yellow rather than as an
 evenly desaturated pink.
 
 Run via main.py:
-    uv run main.py inspect/glow/verify_ycbcr_matrix.py
+    uv run main.py inspect/luminous/verify_ycbcr_matrix.py
 """
 
 import struct
@@ -87,7 +87,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
         "  G = Y - 0.344136*Cb - 0.714136*Cr\n"
         "  B = Y + 1.772000*Cb\n"
         "\n"
-        "For a red glow (negative Cb, positive Cr) landing on a white pixel:\n"
+        "For a red luminous (negative Cb, positive Cr) landing on a white pixel:\n"
         "  delta_G = -0.344136*dCb - 0.714136*dCr  (a small positive term against a\n"
         "                                           larger negative one)\n"
         "  delta_B = +1.772000*dCb                 (a single term, much heavier weight)\n"

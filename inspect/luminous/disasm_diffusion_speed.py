@@ -22,17 +22,17 @@ unclamped output, and verify_accumulate.py for what happens to the six
 values in between.
 
 Run via main.py:
-    uv run main.py inspect/glow/disasm_diffusion_speed.py
+    uv run main.py inspect/luminous/disasm_diffusion_speed.py
 """
 
 from tools.disasm import dump_all
 from tools.pe_image import PEImage
 
-# forward transform: runs once over the glow buffer BEFORE the 6-pass blur
+# forward transform: runs once over the luminous buffer BEFORE the 6-pass blur
 FORWARD_ENTRY = (0x10070550, 0x60)   # clamps 拡散速度 to [1,100], computes base = 1 + speed*0.001
 FORWARD_WORKER = (0x100705C0, 0x140)  # per-pixel: curved = pow(base, y/16) - 1; chroma -> signed byte /16
 
-# inverse transform: runs once over the glow buffer AFTER the 6-pass blur
+# inverse transform: runs once over the luminous buffer AFTER the 6-pass blur
 INVERSE_ENTRY = (0x10070700, 0x80)    # same clamp; computes 1/ln(base)
 INVERSE_WORKER = (0x10070780, 0x160)  # per-pixel: y = round(16 * ln(curved+1) / ln(base)); chroma <<4
 

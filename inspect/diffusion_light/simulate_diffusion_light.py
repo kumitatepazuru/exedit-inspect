@@ -103,9 +103,9 @@ def _composite(src, gy, gcb, gcr, ga):
     ia = 0x1000 - ga
     na = (0x1000800 - (0x1000 - s_a) * ia) >> 12
     w_src = c_div(ia * s_a, na)
-    w_glow = c_div(ga << 12, na)
-    return ((s_y * w_src + gy * w_glow) >> 12, (s_cb * w_src + cb * w_glow) >> 12,
-            (s_cr * w_src + cr * w_glow) >> 12, na)
+    w_luminous = c_div(ga << 12, na)
+    return ((s_y * w_src + gy * w_luminous) >> 12, (s_cb * w_src + cb * w_luminous) >> 12,
+            (s_cr * w_src + cr * w_luminous) >> 12, na)
 
 
 def _object_round(img, w, h, r, strength, grow):
@@ -167,9 +167,9 @@ def _frame_average(samples):
     return tuple(c_div(sum(s[c] for s in samples), n) for c in range(3))
 
 
-def _frame_composite(src, glow, strength):
+def _frame_composite(src, luminous, strength):
     """0x1001e898-0x1001e935."""
-    gy, gcb, gcr = glow
+    gy, gcb, gcr = luminous
     if gy <= 0:
         return src
     d = gy - max(0, src[0])

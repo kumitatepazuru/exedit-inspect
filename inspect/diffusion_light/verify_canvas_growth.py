@@ -203,7 +203,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
         srcs = [cols[d][1] for d in composited]
         print(f"  w={w:3d} r={r:2d}: cols written={len(cols):3d} (expected {w + 2 * r})"
               f"  windows match: {ok_window}")
-        print(f"          glow-only columns: {blank}")
+        print(f"          luminous-only columns: {blank}")
         print(f"          composited columns {composited[0]}..{composited[-1]} -> "
               f"source columns {srcs[0]}..{srcs[-1]} (image is 0..{w - 1})")
         assert ok_window and len(cols) == w + 2 * r

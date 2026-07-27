@@ -1,4 +1,4 @@
-"""Work out 光色の設定 ("glow color setting"): where the picked colour lives
+"""Work out 光色の設定 ("luminous color setting"): where the picked colour lives
 and what changes when one has (or has not) been picked.
 
 func_proc branches on `ex_data->field_0 & 0x1000000` to pick between two
@@ -18,14 +18,14 @@ bit24 clear = use the picked colour for all three channels. The default
 ex_data is 0x01FFFFFF, i.e. bit24 set with an unused white placeholder.
 
 Two things the angr output does not make obvious, covered elsewhere:
-the picked colour's *Y* also scales the glow's luma (verify_extract_alpha.py),
+the picked colour's *Y* also scales the luminous's luma (verify_extract_alpha.py),
 and the conversion matrix behind 0x1006f520 is plain BT.601
 (verify_ycbcr_matrix.py). The two workers decompiled here are the
 frame-filter pair; the object-effect pair is 0x100535a0/0x100536d0
 (verify_mode_mapping.py).
 
 Run via main.py:
-    uv run main.py inspect/glow/disasm_color.py
+    uv run main.py inspect/luminous/disasm_color.py
 """
 
 import logging
@@ -78,7 +78,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
 
     cfg2 = proj.analyses.CFGFast(regions=[(0x1006f000, 0x10070000)], force_complete_scan=False, normalize=True)
     _decompile(proj, cfg2, COLOR_CONVERT_SETUP, "ex_data RGB byte unpack -> calls RGB->YCbCr conversion")
-    _decompile(proj, cfg2, COLOR_CONVERT_WORKER, "generic RGB->YCbCr conversion dispatch (not glow-specific)")
+    _decompile(proj, cfg2, COLOR_CONVERT_WORKER, "generic RGB->YCbCr conversion dispatch (not luminous-specific)")
 
 
 if __name__ == "__main__":

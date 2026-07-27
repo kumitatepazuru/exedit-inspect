@@ -16,7 +16,7 @@ closes that gap two ways, independent of angr's decompiler:
      off-by-one or rounding-mode mistake would show up somewhere in the
      range;
   2. re-implements the consumption side (the per-pixel branch in
-     sub_100533c0, see disasm_params.py/decompile_glow.py) and runs it
+     sub_100533c0, see disasm_params.py/decompile_luminous.py) and runs it
      through the clamp/overflow edge cases (raw=0, the default 1000, and the
      max 2000) to confirm the "strength > 100% raises a flat floor, not just
      a multiplier" reading actually falls out of the arithmetic rather than
@@ -28,7 +28,7 @@ diffusion radius loop in func_proc which does add an explicit 0.5 before
 truncating. The two are easy to conflate but are not the same operation.
 
 Run via main.py:
-    uv run main.py inspect/glow/verify_strength_threshold.py
+    uv run main.py inspect/luminous/verify_strength_threshold.py
 """
 
 from tools.cints import MAGIC_1000, msvc_div, to_i32

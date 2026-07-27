@@ -4,7 +4,7 @@ before comparing it against the threshold.
 
 This matters for a port: an object's transparent (or partially covered)
 pixels normally still carry a full-intensity RGB value in a straight-alpha
-pipeline, so a port that thresholds on plain luma will extract glow from
+pipeline, so a port that thresholds on plain luma will extract luminous from
 areas AviUtl treats as empty, producing a haze around every object. AviUtl
 multiplies first:
 
@@ -24,10 +24,10 @@ The two workers within each pair differ only in where the output chroma
 comes from (bit24 of ex_data): the source pixel's own cb/cr, or the picked
 light color. In the picked-color case the light color's *Y* scales the
 output luma too, i.e. a dark light color produces a proportionally dimmer
-glow - see the `g_101b2004` multiply below.
+luminous - see the `g_101b2004` multiply below.
 
 Run via main.py:
-    uv run main.py inspect/glow/verify_extract_alpha.py
+    uv run main.py inspect/luminous/verify_extract_alpha.py
 """
 
 from tools.disasm import dump_all
@@ -100,11 +100,11 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
         "\n"
         "Two consequences that are easy to miss when porting:\n"
         "  1. The alpha multiply happens BEFORE the threshold comparison, so a\n"
-        "     half-covered edge pixel glows like a half-brightness pixel, and a fully\n"
-        "     transparent one never glows at all no matter what colour it stores.\n"
-        "  2. With a picked light color, the color's own Y scales the glow's luma. A\n"
-        "     pure red light (Y = 0.299 of full) yields a glow only ~30% as luminous as\n"
-        "     the same settings with white - and since the glow's luma is what the\n"
+        "     half-covered edge pixel luminouss like a half-brightness pixel, and a fully\n"
+        "     transparent one never luminouss at all no matter what colour it stores.\n"
+        "  2. With a picked light color, the color's own Y scales the luminous's luma. A\n"
+        "     pure red light (Y = 0.299 of full) yields a luminous only ~30% as luminous as\n"
+        "     the same settings with white - and since the luminous's luma is what the\n"
         "     composite later uses as alpha (see verify_object_composite.py) and what\n"
         "     the diffusion-speed curve exponentiates (see verify_curve_clamp.py), this\n"
         "     scaling has to be applied here, at extraction time, not at the end.\n"

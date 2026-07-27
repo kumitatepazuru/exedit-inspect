@@ -34,7 +34,7 @@ from tools.cints import c_div
 from tools.pe_image import PEImage
 
 # Per-input-channel Q14 rows (Y, Cb, Cr), in AviUtl PIXEL order b, g, r.
-# Same table inspect/glow/verify_ycbcr_matrix.py checks against BT.601.
+# Same table inspect/luminous/verify_ycbcr_matrix.py checks against BT.601.
 COEF_VA = {"b": 0x100A989C, "g": 0x100A98A4, "r": 0x100A98AC}
 
 

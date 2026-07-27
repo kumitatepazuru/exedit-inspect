@@ -14,9 +14,9 @@ Findings, both read straight out of the operands below:
     pass step 2 (sub_100540a0 / sub_100544a0) reads that scratch buffer and
     writes back into ycp_temp - exactly where the next iteration's step 1
     reads from. So iteration N+1 blurs on top of iteration N's output.
-    Step 2 additionally folds its result into the glow accumulator (see
+    Step 2 additionally folds its result into the luminous accumulator (see
     verify_accumulate.py for the saturating arithmetic it uses there), so
-    the final glow is the sum of all six differently-sized blurs, not just
+    the final luminous is the sum of all six differently-sized blurs, not just
     the widest one.
 
   * Step 1 slides by the row stride (*(fpip+0x14) * 6 bytes - that field is
@@ -37,7 +37,7 @@ Which worker of the pair runs is picked by fp->flag & 0x20 - object effect
 vs frame filter, see verify_mode_mapping.py.
 
 Run via main.py:
-    uv run main.py inspect/glow/verify_blur_chain.py
+    uv run main.py inspect/luminous/verify_blur_chain.py
 """
 
 import re
@@ -106,7 +106,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
         f"  ping-pong: ycp_temp (fpip+8) <-> global scratch (0x{SCRATCH_BUFFER_VA:08x})\n"
         "  step 1 is vertical (slides by the row stride, radius clamped by h/2-1),\n"
         "  step 2 is horizontal (slides by one pixel, radius clamped by w/2-1) and is\n"
-        "  also the step that folds this pass's result into the glow accumulator.\n"
+        "  also the step that folds this pass's result into the luminous accumulator.\n"
         "  So pass N+1 blurs pass N's already-blurred output, and the accumulator ends\n"
         "  up holding all six blur scales combined - see verify_accumulate.py for the\n"
         "  saturating arithmetic that combination actually uses.\n"

@@ -51,7 +51,7 @@ TABLE_HI = 0x101DEF78  # claimed to be table[4096]
 
 def trunc_double_to_int(x):
     """sub_10091ad8: CRT double->int helper used throughout exedit (see
-    inspect/blur, inspect/glow READMEs) - truncates toward zero."""
+    inspect/blur, inspect/luminous READMEs) - truncates toward zero."""
     return math.trunc(x)
 
 

@@ -1,4 +1,4 @@
-"""Decompile/disassemble the 発光 (glow) filter's func_proc and its worker
+"""Decompile/disassemble the 発光 (luminous) filter's func_proc and its worker
 functions in exedit.auf.
 
 func_proc's address (0x10053100) was found with `tools.filter_table --name 発光`. This
@@ -16,7 +16,7 @@ which is both much faster and avoids pulling in unrelated functions), then:
      double->int64 truncation thunk and a wrapper around pow(double,int).
 
 Run via main.py:
-    uv run main.py inspect/glow/decompile_glow.py
+    uv run main.py inspect/luminous/decompile_luminous.py
 """
 
 import argparse
@@ -36,8 +36,8 @@ WORKERS = {
     "threshold+gain extract, object mode": 0x100535A0,
     "threshold+gain extract, object mode (variant)": 0x100536D0,
     "per-pass blur dispatch (radius clamp + thread fan-out)": 0x10053A30,
-    "composite/add glow onto frame": 0x10053800,
-    "composite/add glow into offscreen object buffer": 0x10053890,
+    "composite/add luminous onto frame": 0x10053800,
+    "composite/add luminous into offscreen object buffer": 0x10053890,
 }
 
 # Tiny CRT-style FP helper stubs the decompiler renders as "unsupported

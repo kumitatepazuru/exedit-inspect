@@ -1,9 +1,9 @@
 """Show that the object-effect composite is an alpha-aware blend, not the
 per-channel addition the frame-filter composite uses.
 
-The glow accumulator holds 6-byte PIXEL_YC values, but an object's image is
-8-byte PIXEL_YCA. sub_10053890 bridges the two by treating the glow's *luma*
-as the glow layer's alpha, and un-premultiplying the colour by the resulting
+The luminous accumulator holds 6-byte PIXEL_YC values, but an object's image is
+8-byte PIXEL_YCA. sub_10053890 bridges the two by treating the luminous's *luma*
+as the luminous layer's alpha, and un-premultiplying the colour by the resulting
 alpha:
 
     a = dst.a
@@ -24,7 +24,7 @@ alpha:
         dst.cr = (dst.cr * a + (g.cr << 12)) / na
         dst.a  = na
 
-So the glow behaves as a layer whose coverage is its own luma (saturating at
+So the luminous behaves as a layer whose coverage is its own luma (saturating at
 4096) and whose premultiplied colour is the accumulator value, composited
 with *additive* alpha - not the usual a + b - a*b. Note also that the opaque
 branch never clamps, so an object's interior can end up with y well past
@@ -34,7 +34,7 @@ sub_10053800, the frame-filter composite, is printed alongside for contrast:
 frames have no alpha, so it is a straight `add word` of all three channels.
 
 Run via main.py:
-    uv run main.py inspect/glow/verify_object_composite.py
+    uv run main.py inspect/luminous/verify_object_composite.py
 """
 
 from tools.disasm import dump_all
@@ -48,16 +48,16 @@ ANNOTATIONS = {
     0x1005392E: "compare alpha against 4096 (fully opaque?)",
     0x10053936: "--- opaque branch: plain 16-bit add of y/cb/cr, no clamp ---",
     0x10053951: "test alpha <= 0",
-    0x10053955: "--- transparent branch: new alpha = glow luma ---",
+    0x10053955: "--- transparent branch: new alpha = luminous luma ---",
     0x10053962: "clamp new alpha to 4096",
-    0x1005396F: "(glow.y << 12) / new_alpha  -> un-premultiplied luma",
-    0x1005398F: "--- partial branch: new alpha = dst.a + glow luma ---",
-    0x100539A6: "(dst.y * dst.a + (glow.y << 12)) / new_alpha",
+    0x1005396F: "(luminous.y << 12) / new_alpha  -> un-premultiplied luma",
+    0x1005398F: "--- partial branch: new alpha = dst.a + luminous luma ---",
+    0x100539A6: "(dst.y * dst.a + (luminous.y << 12)) / new_alpha",
     0x100539E1: "store new alpha into dst.a",
     0x100539F0: "advance dst by 8 bytes (PIXEL_YCA)",
-    0x100539ED: "advance glow accumulator by 6 bytes (PIXEL_YC)",
+    0x100539ED: "advance luminous accumulator by 6 bytes (PIXEL_YC)",
     0x10053855: "frame path: dst = fpip->ycp_edit (+4)",
-    0x10053858: "frame path: src = the glow accumulator *(fpip+0xB0)",
+    0x10053858: "frame path: src = the luminous accumulator *(fpip+0xB0)",
     0x10053866: "--- frame path: unconditional per-channel add, no alpha involved ---",
 }
 
@@ -70,17 +70,17 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
 
     print(
         "\n"
-        "Verdict: only the opaque case is additive. Everywhere else the glow's luma\n"
+        "Verdict: only the opaque case is additive. Everywhere else the luminous's luma\n"
         "becomes the layer's alpha and the colour is divided by the combined alpha,\n"
         "with the alphas *added* (then clamped to 4096) rather than combined with the\n"
-        "usual a + b - a*b. A port that composites the glow additively will match on an\n"
+        "usual a + b - a*b. A port that composites the luminous additively will match on an\n"
         "opaque interior and drift everywhere the object is transparent or antialiased.\n"
         "\n"
         "Equivalence note: over a fully transparent destination the result is\n"
-        "  colour = glow / min(glow.y, 4096),  alpha = min(glow.y, 4096)\n"
-        "whose premultiplied product is just `glow` again - so the difference only\n"
+        "  colour = luminous / min(luminous.y, 4096),  alpha = min(luminous.y, 4096)\n"
+        "whose premultiplied product is just `luminous` again - so the difference only\n"
         "shows up once something is composited behind or below it, or once the alpha\n"
-        "saturates. Because that saturation point is glow.y = 4096 and glow.y already\n"
+        "saturates. Because that saturation point is luminous.y = 4096 and luminous.y already\n"
         "carries the light colour's Y factor (verify_extract_alpha.py), a dark light\n"
         "colour keeps the halo translucent far longer than a naive port would.\n"
     )

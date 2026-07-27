@@ -90,8 +90,8 @@ ANNOTATIONS = {
     0x1001CF12: "subtract",
     0x1001CF1C: ">> 12 -> na, the source-over alpha",
     0x1001CF1F: "w_src  = ia * src.a / na",
-    0x1001CF2D: "w_glow = (ga << 12) / na",
-    0x1001CF39: "src.y * w_src + gy * w_glow ...",
+    0x1001CF2D: "w_luminous = (ga << 12) / na",
+    0x1001CF39: "src.y * w_src + gy * w_luminous ...",
     0x1001CF3F: "... >> 12",
     0x1001CF68: "out.a = na",
     0x1001CF79: "the untouched path: 8 bytes copied straight across",
@@ -148,9 +148,9 @@ def composite_object(src, gy, gcb, gcr, ga):
     ia = 0x1000 - ga
     na = (0x1000800 - (0x1000 - s_a) * ia) >> 12
     w_src = c_div(ia * s_a, na)
-    w_glow = c_div(ga << 12, na)
-    return ((s_y * w_src + gy * w_glow) >> 12, (s_cb * w_src + cb_mix * w_glow) >> 12,
-            (s_cr * w_src + cr_mix * w_glow) >> 12, na)
+    w_luminous = c_div(ga << 12, na)
+    return ((s_y * w_src + gy * w_luminous) >> 12, (s_cb * w_src + cb_mix * w_luminous) >> 12,
+            (s_cr * w_src + cr_mix * w_luminous) >> 12, na)
 
 
 def composite_frame(src, gy, gcb, gcr, strength):

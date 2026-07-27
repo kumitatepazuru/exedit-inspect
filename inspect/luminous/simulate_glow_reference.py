@@ -28,8 +28,8 @@ object, light color #f00, strength 60 / diffusion 45 / threshold 20 /
 diffusion speed 60, sampled inside the fill.
 
 Run via main.py:
-    uv run main.py inspect/glow/simulate_glow_reference.py
-    uv run main.py inspect/glow/simulate_glow_reference.py --speed 0 --src ffffff
+    uv run main.py inspect/luminous/simulate_luminous_reference.py
+    uv run main.py inspect/luminous/simulate_luminous_reference.py --speed 0 --src ffffff
 """
 
 import argparse
@@ -121,9 +121,9 @@ def accumulate_saturating(start, contribution, passes=6):
     return acc_y, acc_cb, acc_cr
 
 
-def curve_roundtrip(glow, base, passes=6):
+def curve_roundtrip(luminous, base, passes=6):
     """sub_100705c0 -> sub_100548a0 x6 -> sub_10070780."""
-    gy, gcb, gcr = glow
+    gy, gcb, gcr = luminous
     curved = base ** (max(0, min(4096, gy)) / 16.0) - 1.0
     cb_b = max(-128, min(127, (gcb + 8) >> 4))
     cr_b = max(-128, min(127, (gcr + 8) >> 4))
@@ -136,9 +136,9 @@ def curve_roundtrip(glow, base, passes=6):
     return y_out, acc_cb << 4, acc_cr << 4
 
 
-def composite_object(dst, dst_a, glow):
+def composite_object(dst, dst_a, luminous):
     """sub_10053890."""
-    gy, gcb, gcr = glow
+    gy, gcb, gcr = luminous
     if dst_a >= 4096:
         return (dst[0] + gy, dst[1] + gcb, dst[2] + gcr), dst_a
     if dst_a <= 0:
@@ -146,12 +146,12 @@ def composite_object(dst, dst_a, glow):
         if na <= 0:
             return dst, dst_a
         na = min(na, 4096)
-        return tuple((c << 12) // na for c in glow), na
+        return tuple((c << 12) // na for c in luminous), na
     na = dst_a + gy
     if na <= 0:
         return dst, dst_a
     na = min(na, 4096)
-    return tuple((d * dst_a + (g << 12)) // na for d, g in zip(dst, glow)), na
+    return tuple((d * dst_a + (g << 12)) // na for d, g in zip(dst, luminous)), na
 
 
 def aviutl_reference(rows, src_rgb, src_alpha, light_rgb, strength_ui, threshold_ui,
@@ -159,23 +159,23 @@ def aviutl_reference(rows, src_rgb, src_alpha, light_rgb, strength_ui, threshold
     gain, overflow, threshold = params_from_ui(strength_ui, threshold_ui)
     src = rgb_to_yc(rows, *src_rgb)
     light_yc = rgb_to_yc(rows, *light_rgb) if light_rgb else None
-    glow = extract(src, src_alpha, gain, overflow, threshold, light_yc, object_mode)
+    luminous = extract(src, src_alpha, gain, overflow, threshold, light_yc, object_mode)
 
     if speed > 0:
         base = 1.0 + max(1, min(100, speed)) * 0.001
-        accum = curve_roundtrip(glow, base)
+        accum = curve_roundtrip(luminous, base)
         if object_mode:
             out, out_a = composite_object(src, src_alpha, accum)
         else:
             out = tuple(s + a for s, a in zip(src, accum))
             out_a = src_alpha
     elif object_mode:
-        accum = accumulate_saturating((0, 0, 0), glow)
+        accum = accumulate_saturating((0, 0, 0), luminous)
         out, out_a = composite_object(src, src_alpha, accum)
     else:
         # frame filter, speed = 0: each pass accumulates straight into the image,
         # so the saturating accumulator starts from the image pixel itself.
-        out = accumulate_saturating(src, glow)
+        out = accumulate_saturating(src, luminous)
         out_a = src_alpha
     return yc_to_rgb(*out), out, out_a
 
@@ -228,7 +228,7 @@ def port_model(src_rgb, src_alpha, light_rgb, strength_ui, threshold_ui, speed,
         y_final = math.log(acc_y + 1.0) / (256.0 * math.log(base))
         y_component = y_final if fixed else y_final * luma_color
         premul = _yc_to_rgb_norm(y_component, acc_cb, acc_cr)
-        glow_alpha = max(0.0, min(1.0, y_final))
+        luminous_alpha = max(0.0, min(1.0, y_final))
     elif fixed:
         acc_y, acc_cb, acc_cr = 0.0, 0.0, 0.0
         for _ in range(6):                      # saturating accumulator, normalised
@@ -241,17 +241,17 @@ def port_model(src_rgb, src_alpha, light_rgb, strength_ui, threshold_ui, speed,
                 acc_cb = (acc_cb + amount * cb_dev) * t
                 acc_cr = (acc_cr + amount * cr_dev) * t
         premul = _yc_to_rgb_norm(acc_y, acc_cb, acc_cr)
-        glow_alpha = max(0.0, min(1.0, acc_y))
+        luminous_alpha = max(0.0, min(1.0, acc_y))
     else:
         total = amount * 6
         lrgb = [c / 255.0 for c in light_rgb]
         premul = tuple(total * c for c in lrgb)
-        glow_alpha = max(0.0, min(1.0, total))
+        luminous_alpha = max(0.0, min(1.0, total))
 
     base_a = src_alpha / 4096.0
     base_premul = [c / 255.0 * base_a for c in src_rgb]
-    out_a = (min(1.0, base_a + glow_alpha) if fixed
-             else max(0.0, min(1.0, base_a + glow_alpha - base_a * glow_alpha)))
+    out_a = (min(1.0, base_a + luminous_alpha) if fixed
+             else max(0.0, min(1.0, base_a + luminous_alpha - base_a * luminous_alpha)))
     if out_a <= 1e-6:
         return (0, 0, 0), 0
     out = [max(0.0, min(1.0, (bp + gp) / out_a)) for bp, gp in zip(base_premul, premul)]
@@ -264,7 +264,7 @@ def _parse_rgb(text):
 
 
 def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(prog="simulate_glow_reference")
+    ap = argparse.ArgumentParser(prog="simulate_luminous_reference")
     ap.add_argument("--src", default="ffffff", help="source pixel RGB (default: ffffff)")
     ap.add_argument("--alpha", type=int, default=4096, help="source alpha 0..4096 (default: 4096)")
     ap.add_argument("--color", default="ff0000", help="light color RGB, or 'none' (default: ff0000)")
@@ -305,7 +305,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
 
     if args.alpha == 0:
         print("\nNote: the source pixel is fully transparent, so AviUtl extracts nothing from\n"
-              "it (a=0 in, a=0 out). Any nonzero alpha on the port rows is glow invented out\n"
+              "it (a=0 in, a=0 out). Any nonzero alpha on the port rows is luminous invented out\n"
               "of a pixel AviUtl treats as empty - the haze-around-objects symptom.")
 
     if not argv:

@@ -1,4 +1,4 @@
-"""Show how each of the 6 blur passes is folded into the glow accumulator -
+"""Show how each of the 6 blur passes is folded into the luminous accumulator -
 which is not the plain unclamped addition it looks like from the call graph.
 
 Two different accumulators exist, picked by 拡散速度 (sub_10053a30):
@@ -15,9 +15,9 @@ Two different accumulators exist, picked by 拡散速度 (sub_10053a30):
                                           acc.cb = ((acc.cb + pass.cb) * t) >> 13
                                           acc.cr = ((acc.cr + pass.cr) * t) >> 13
 
-      i.e. once the running glow passes 8192 the accumulator stops getting
+      i.e. once the running luminous passes 8192 the accumulator stops getting
       brighter and starts *losing saturation* on every further pass, washing
-      a strong glow toward white instead of letting it grow without bound.
+      a strong luminous toward white instead of letting it grow without bound.
 
   diffusion speed > 0  -> sub_100548a0
       float luma accumulator with NO clamp at all (`fadd [esi]` / `fstp [esi]`)
@@ -28,7 +28,7 @@ Both variants therefore diverge from "sum the six passes"; the first
 saturates, the second is unbounded in luma but heavily quantised in chroma.
 
 Run via main.py:
-    uv run main.py inspect/glow/verify_accumulate.py
+    uv run main.py inspect/luminous/verify_accumulate.py
 """
 
 from tools.disasm import dump_all
@@ -105,7 +105,7 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
 
     print(
         "\nNumeric replay, 6 passes each contributing the same value (a stand-in for the\n"
-        "middle of a large flat glow source; real content varies per pass but the\n"
+        "middle of a large flat luminous source; real content varies per pass but the\n"
         "saturation behaviour is what matters here).\n"
     )
     print("  diffusion speed = 0, contribution per pass = (y, cb, cr):")
@@ -129,12 +129,12 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
         "Verdict: neither accumulator is a plain sum.\n"
         "  * speed=0: luma saturates at 8192 (2x full white) and, past that point,\n"
         "    every further pass multiplies the accumulated chroma by (16384-s)/8192,\n"
-        "    so an over-driven glow desaturates toward white instead of growing.\n"
+        "    so an over-driven luminous desaturates toward white instead of growing.\n"
         "  * speed>0: luma is accumulated as an unclamped float in curved space (the\n"
         "    later log is what tames it), while chroma is a signed byte re-clamped to\n"
         "    [-128,127] on every single pass - a saturated light colour hits that\n"
         "    ceiling within one or two passes and then stops contributing colour while\n"
-        "    the luma keeps climbing, which is what makes a strong red glow read as\n"
+        "    the luma keeps climbing, which is what makes a strong red luminous read as\n"
         "    yellow/white rather than deeper red.\n"
     )
 

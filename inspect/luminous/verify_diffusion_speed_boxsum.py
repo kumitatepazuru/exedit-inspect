@@ -21,7 +21,7 @@ there is no Gaussian (or any other non-uniform) weighting anywhere in this
 filter's blur, in either precision variant.
 
 Run via main.py:
-    uv run main.py inspect/glow/verify_diffusion_speed_boxsum.py
+    uv run main.py inspect/luminous/verify_diffusion_speed_boxsum.py
 """
 
 import re

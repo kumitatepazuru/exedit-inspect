@@ -25,14 +25,14 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 
 ## 解析済みエフェクト
 
-| ディレクトリ | エフェクト | 概要 |
-|---|---|---|
-| [`inspect/blur`](inspect/blur/README.md) | `ぼかし` | 4パス連鎖のボックス平均。軸ごとの2パスが三角形カーネルを合成する |
-| [`inspect/boundary_blur`](inspect/boundary_blur/README.md) | `境界ぼかし` | アルファだけを操作する erosion + cosine イージングテーブル |
-| [`inspect/glow`](inspect/glow/README.md) | `発光` | 明部抽出 + 6段マルチスケールぼかし。`拡散速度` は指数/対数空間でのぼかし |
-| [`inspect/mozaic`](inspect/mozaic/README.md) | `モザイク` | ブロック平均と `タイル風` のハイライト |
-| [`inspect/glint`](inspect/glint/README.md) | `閃光` | 中心へ向かう放射状の光線サンプリング。輝度をそのままアルファに移して出力 |
-| [`inspect/diffusion_light`](inspect/diffusion_light/README.md) | `拡散光` | 画像そのもののボックス平均を2ラウンド。「元より明るくなった画素だけ」書き戻す |
+| ディレクトリ                                                   | エフェクト   | 概要                                                                          |
+| -------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------- |
+| [`inspect/blur`](inspect/blur/README.md)                       | `ぼかし`     | 4パス連鎖のボックス平均。軸ごとの2パスが三角形カーネルを合成する              |
+| [`inspect/boundary_blur`](inspect/boundary_blur/README.md)     | `境界ぼかし` | アルファだけを操作する erosion + cosine イージングテーブル                    |
+| [`inspect/luminous`](inspect/luminous/README.md)               | `発光`       | 明部抽出 + 6段マルチスケールぼかし。`拡散速度` は指数/対数空間でのぼかし      |
+| [`inspect/mozaic`](inspect/mozaic/README.md)                   | `モザイク`   | ブロック平均と `タイル風` のハイライト                                        |
+| [`inspect/glint`](inspect/glint/README.md)                     | `閃光`       | 中心へ向かう放射状の光線サンプリング。輝度をそのままアルファに移して出力      |
+| [`inspect/diffusion_light`](inspect/diffusion_light/README.md) | `拡散光`     | 画像そのもののボックス平均を2ラウンド。「元より明るくなった画素だけ」書き戻す |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 
@@ -48,16 +48,16 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 これらの上に乗っていて、pefile / capstone / angr を直接触るのは、CFG そのものを
 一覧したい2箇所だけ。
 
-| ツール | 役割 |
-|---|---|
-| `tools.get_func_address` | `FILTER_DLL` 配列(先頭 `0x100a3e28`)を1行/エフェクトでダンプ |
-| `tools.filter_table` | 登録構造体の完全デコード。トラックバー・チェックボックス・`ex_data_def`・`+0x74` 拡張ブロック。`--name <名前>` で1エフェクト分を詳細表示 |
-| `tools.track_scale` | `+0x74` 拡張ブロックの解読 ―― 表示スケール / スライダーのドラッグ範囲 / 多成分コントロールのグループ化マーカー。`--groups` で全エフェクト分の根拠を出力 |
-| `tools.disasm` | capstone 逆アセンブル。絶対メモリオペランドの定数解決と、アドレス指定・ルール指定どちらの注釈にも対応 |
-| `tools.decompile` | angr の範囲限定デコンパイル。`--calls` で直接呼び出し先を列挙 |
-| `tools.xrefs` | 任意の VA への参照を全画像から検索し、どのエフェクトのコードかを推定 |
-| `tools.pe_image` | (ライブラリ)PE を VA でアドレッシングする共通基盤 |
-| `tools.cints` | (ライブラリ)C / x86 の整数意味論。`c_div`(0方向切り捨て)、`sar`(floor)、MSVC のマジックナンバー除算の逐語再現 |
+| ツール                   | 役割                                                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tools.get_func_address` | `FILTER_DLL` 配列(先頭 `0x100a3e28`)を1行/エフェクトでダンプ                                                                                            |
+| `tools.filter_table`     | 登録構造体の完全デコード。トラックバー・チェックボックス・`ex_data_def`・`+0x74` 拡張ブロック。`--name <名前>` で1エフェクト分を詳細表示                |
+| `tools.track_scale`      | `+0x74` 拡張ブロックの解読 ―― 表示スケール / スライダーのドラッグ範囲 / 多成分コントロールのグループ化マーカー。`--groups` で全エフェクト分の根拠を出力 |
+| `tools.disasm`           | capstone 逆アセンブル。絶対メモリオペランドの定数解決と、アドレス指定・ルール指定どちらの注釈にも対応                                                   |
+| `tools.decompile`        | angr の範囲限定デコンパイル。`--calls` で直接呼び出し先を列挙                                                                                           |
+| `tools.xrefs`            | 任意の VA への参照を全画像から検索し、どのエフェクトのコードかを推定                                                                                    |
+| `tools.pe_image`         | (ライブラリ)PE を VA でアドレッシングする共通基盤                                                                                                       |
+| `tools.cints`            | (ライブラリ)C / x86 の整数意味論。`c_div`(0方向切り捨て)、`sar`(floor)、MSVC のマジックナンバー除算の逐語再現                                           |
 
 `tools.pe_image` と `tools.cints` はライブラリなので `main.py` からは実行できない。
 

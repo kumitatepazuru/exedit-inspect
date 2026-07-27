@@ -6,12 +6,12 @@ across the whole project. Defaults point at the AviUtl exedit plugin and its
 filter header:
 
     uv run main.py tools.get_func_address
-    uv run main.py inspect/glow/find_addr.py
+    uv run main.py inspect/luminous/find_addr.py
     uv run main.py tools.get_func_address --dll-path data/other.auf --header data/other.h
 
 A target may be given either as a dotted module path (resolved via regular
 Python import, e.g. "tools.get_func_address") or as a file path (resolved by
-loading that file directly, e.g. "inspect/glow/find_addr.py"). File-path
+loading that file directly, e.g. "inspect/luminous/find_addr.py"). File-path
 loading is what scripts under inspect/ should use, since naming a package
 "inspect" would shadow the standard library module of the same name.
 
@@ -54,7 +54,7 @@ def _load_target(target: str):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("target", help='dotted module path ("tools.get_func_address") or script file path ("inspect/glow/find_addr.py")')
+    parser.add_argument("target", help='dotted module path ("tools.get_func_address") or script file path ("inspect/luminous/find_addr.py")')
     parser.add_argument("--dll-path", default=DEFAULT_DLL_PATH, help="path to the target DLL/AUF (default: %(default)s)")
     parser.add_argument("--header", dest="headers", action="append", help="header file to use; repeatable (default: data/filter.h)")
     args, extra = parser.parse_known_args()

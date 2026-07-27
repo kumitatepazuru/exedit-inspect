@@ -14,12 +14,12 @@ on the way in, and what is deliberately left unclamped on the way out.
 
 The asymmetry is the point. The input clamp means the exponent can never
 exceed 256 no matter what the extraction produced, but the output is written
-straight back as a 16-bit PIXEL_YC luma with no ceiling, so the glow buffer
+straight back as a 16-bit PIXEL_YC luma with no ceiling, so the luminous buffer
 routinely ends up brighter than 4096 (full white) after a strong diffusion
 speed. Downstream that over-range luma is what the object composite feeds
 into its alpha, and what finally gets clipped per channel during YCbCr->RGB -
 clipping R and G while a saturated Cb still pulls B down, which is how a red
-glow lands on yellow rather than on red.
+luminous lands on yellow rather than on red.
 
 The 6-byte record the two workers share is {float y; int8 cb; int8 cr},
 occupying the same 6 bytes per pixel as a PIXEL_YC - the forward pass
@@ -27,7 +27,7 @@ rewrites the buffer in place into that layout and the inverse pass turns it
 back into a real PIXEL_YC.
 
 Run via main.py:
-    uv run main.py inspect/glow/verify_curve_clamp.py
+    uv run main.py inspect/luminous/verify_curve_clamp.py
 """
 
 import math
@@ -77,14 +77,14 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
     )
     base = 1.06
     brightness = ((4095 - 819) * 2457) >> 12          # extraction, see verify_strength_threshold.py
-    for label, glow_y in (("light color applied (colorY=1224)", (1224 * brightness) >> 12),
+    for label, luminous_y in (("light color applied (colorY=1224)", (1224 * brightness) >> 12),
                           ("light color NOT applied (a port bug)", brightness)):
-        y_in = max(0, min(4096, glow_y))
+        y_in = max(0, min(4096, luminous_y))
         curved = base ** (y_in / 16.0) - 1.0
         total = curved * 6
         y_out = int(16 * math.log(total + 1.0) / math.log(base) + 0.5)
         print(f"  {label}:")
-        print(f"    glow luma in = {glow_y:5d} -> curved = {curved:12.3f}"
+        print(f"    luminous luma in = {luminous_y:5d} -> curved = {curved:12.3f}"
               f" -> sum of 6 = {total:13.3f} -> y' = {y_out:6d}"
               f"  ({'over' if y_out > 4096 else 'under'} 4096)")
 
@@ -93,8 +93,8 @@ def run(dll_path: str, headers: list[str], argv: list[str] | None = None) -> Non
         "Verdict: the forward transform clamps its input to [0,4096] before the pow,\n"
         "and the inverse writes its result back unclamped as a 16-bit luma. Both\n"
         "matter for a port: the first bounds the exponent, the second is what lets the\n"
-        "glow exceed full white and clip in RGB later. And because the exponent is\n"
-        "taken from the *extracted glow luma*, which already includes the light\n"
+        "luminous exceed full white and clip in RGB later. And because the exponent is\n"
+        "taken from the *extracted luminous luma*, which already includes the light\n"
         "colour's Y (verify_extract_alpha.py), applying that colour factor after the\n"
         "curve instead of before it changes the result by orders of magnitude - see\n"
         "the two rows above.\n"

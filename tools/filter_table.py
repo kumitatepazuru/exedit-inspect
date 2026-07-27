@@ -71,7 +71,7 @@ FLAG_EX_DATA = 0x400
 FLAG_VIDEO_FILTER = 0x10000000
 # exedit reuses AviUtl's FILTER.flag bit 0x20 (FILTER_FLAG_ALWAYS_ACTIVE) to
 # mean "this registration is the object-effect variant"; effects registered
-# twice differ in this bit alone (see inspect/glow, inspect/blur, inspect/mozaic).
+# twice differ in this bit alone (see inspect/luminous, inspect/blur, inspect/mozaic).
 FLAG_OBJECT_EFFECT = 0x20
 
 

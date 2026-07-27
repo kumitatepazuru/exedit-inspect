@@ -2,7 +2,7 @@
 two exec_multi_thread_func dispatch calls.
 
 This is the whole function - 境界ぼかし has no separate worker-selection
-dispatcher the way ぼかし/発光 do (see inspect/blur, inspect/glow); func_proc
+dispatcher the way ぼかし/発光 do (see inspect/blur, inspect/luminous); func_proc
 itself computes the two radii, clamps them, and picks one of two worker pairs
 based on the `透明度の境界をぼかす` checkbox.
 
