@@ -36,6 +36,7 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/glow`](inspect/glow/README.md)                       | `グロー`     | 明部抽出 + `形状` 6択(カスケードぼかし / 縦横・斜めのストリーク)。平均せず足す |
 | [`inspect/chroma_key`](inspect/chroma_key/README.md)           | `クロマキー` | Cb-Cr 平面の色相角＋彩度だけで抜く。`境界補正` は16bitマットの3パス処理       |
 | [`inspect/color_key`](inspect/color_key/README.md)             | `カラーキー` | YCbCr の軸並行な直方体で2値判定。浮動小数点ゼロ。`境界補正` がアルファを潰す |
+| [`inspect/luma_key`](inspect/luma_key/README.md)               | `ルミナンスキー` | 輝度1軸のランプ4種。959バイト・グローバル0個で解析済み中最小            |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 
