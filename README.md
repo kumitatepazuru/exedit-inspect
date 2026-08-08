@@ -39,6 +39,7 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/luma_key`](inspect/luma_key/README.md)               | `ルミナンスキー` | 輝度1軸のランプ4種。959バイト・グローバル0個で解析済み中最小            |
 | [`inspect/light`](inspect/light/README.md)                     | `ライト`     | `比率` がアルファ勾配ベースの陰影(自分に加算)と後光(別キャンバス)を配分する2系統エフェクト |
 | [`inspect/shadow`](inspect/shadow/README.md)                   | `シャドー`   | アルファだけを4パスでぼかして平坦な色で塗る。`ex_data` にパターン画像のパスを持つ |
+| [`inspect/border`](inspect/border/README.md)                   | `縁取り`     | アルファを**割らずに**足して飽和させる = 膨張(dilation)。`ぼかし` は窓の和に掛かる利得 |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 
