@@ -41,6 +41,7 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/shadow`](inspect/shadow/README.md)                   | `シャドー`   | アルファだけを4パスでぼかして平坦な色で塗る。`ex_data` にパターン画像のパスを持つ |
 | [`inspect/border`](inspect/border/README.md)                   | `縁取り`     | アルファを**割らずに**足して飽和させる = 膨張(dilation)。`ぼかし` は窓の和に掛かる利得 |
 | [`inspect/convex_edge`](inspect/convex_edge/README.md)         | `凸エッジ`   | アルファの方向微分を輝度に足す面取り。暗側は乗算・明側は加算。**846バイトで解析済み最小** |
+| [`inspect/edge_extraction`](inspect/edge_extraction/README.md) | `エッジ抽出` | Prewitt オペレータ。エッジの強さがそのまま単色画像のアルファになる            |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 

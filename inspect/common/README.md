@@ -86,6 +86,7 @@ uv run main.py tools.decompile --addr 0x........ --calls
 | `0x10020900`                | モーダルダイアログのラッパ | 前後で2つのウィンドウを `EnableWindow` する。`シャドー` と `縁取り` のファイル選択だけが呼ぶ。**中身は未読** | [シャドー](../shadow/README.md)               |
 | `0x10065270`                | 汎用 `FILTER+0x58`       | `SendMessageA(combo, CB_SETCURSEL, ex_data[0], 0)`。`ルミナンスキー` と `インターレース解除` が共有         | [filter_registration](filter_registration.md) |
 | `0x1006c680`                | 共有 LUT 初期化          | `0x101daf68`/`0x101dcf78`/`0x101def80` を cos/sin/1-cos で生成。呼び出し元は未特定                          | [lut_tables](lut_tables.md)                   |
+| `0x10041358`〜`0x10041500`  | 設定ウィンドウの通知     | `wParam = (通し番号<<16) \| 0x1e19/0x1e1a/0x1e1b/0x1e1c`(トラックバー / チェック / ボタン / コンボ)      | [filter_registration](filter_registration.md) |
 | `0x1006f520`                | RGB→YCbCr                | → `0x1006f6e0` / `0x1006f5b0`。係数は BT.601 フルレンジ(Q14)                                                | [rgb_ycbcr](rgb_ycbcr.md)                     |
 | `0x1006fed0`                | 光色の分解               | `ex_data` 下位24bit を R/G/B に分け `0x1006f520` を呼ぶ。bit24 に関係なく毎フレーム実行                     | [rgb_ycbcr](rgb_ycbcr.md)                     |
 | `0x10070220` → `0x10070290` | 輝度カーブ順変換(8B)     | `y = pow(base, clamp(y,0,4096)/16) - 1`、色差は `(c+8)>>4`                                                  | [exp_log_curve](exp_log_curve.md)             |
@@ -253,6 +254,23 @@ y/cb/cr は素通りする。
 `func_WndProc`(`0x10018080`)と `FILTER+0x58`(`0x10065270`)は他エフェクトと共有の
 汎用コードなので、自前の UI コードすら持たない。`y` しか読まず `a` しか書かず、
 近傍も読まないので `境界補正` に相当するものも無い。
+表示スケールも1つも無い唯一のエフェクト。
+
+### エッジ抽出 ― [`inspect/edge_extraction`](../edge_extraction/README.md)
+
+| アドレス     | 役割                     | 概要                                                                                               |
+| ------------ | ------------------------ | -------------------------------------------------------------------------------------------------- |
+| `0x10022d60` | `func_proc`              | パラメータ2本、光色分解、チェックボックス2個の3分岐、バッファ入れ替え。**画素ループを持たない**    |
+| `0x10022e30` | ワーカー(色エッジ)      | 両チェックOFF。`y`/`cb`/`cr` に Prewitt、**平方根を3回**取って足す                                 |
+| `0x100234c0` | ワーカー(輝度エッジ)    | `y * a` に Prewitt。既定                                                                           |
+| `0x10023880` | ワーカー(透明度エッジ)  | `a` に Prewitt。プリマルチプライの分岐が無い                                                       |
+| `0x10023af0` | `func_WndProc`           | `0x1e1a` でチェックボックスを**排他**にし、`0x1e1b` で色ダイアログ(フラグ `2`)                    |
+| `0x10023c00` | ボタンラベル再構築       | bit24 を見ない。`RGB ( %d , %d , %d )` 固定                                                        |
+| `0x10023c60` | `FILTER+0x58`            | 設定ウィンドウ更新エントリ(`閃光`/`クロマキー` と同じ流用)                                        |
+
+3ワーカーとも **Prewitt オペレータ**(Sobel ではない)＋ `sqrt(Gx²+Gy²)`。出力の
+y/cb/cr は光色そのもので、**エッジの強さがアルファになる**。外周1画素は必ず
+アルファ0で潰される。キャンバス拡張も早期 return も無い。
 
 ### モザイク ― [`inspect/mozaic`](../mozaic/README.md)
 
@@ -362,6 +380,10 @@ y/cb/cr は素通りする。
 | `0x100a09e0`                               | `FILTER_DLL`         | `境界ぼかし`(オブジェクトのみ)                                         | [境界ぼかし](../boundary_blur/README.md)      |
 | `0x100a21b8`                               | `+0x74` 拡張ブロック | `拡散光`。2つの登録エントリで共有                                      | [param_scaling](param_scaling.md)             |
 | `0x100a21d0` / `0x100a22f8`                | `FILTER_DLL`         | `拡散光` オブジェクト / フレーム                                       | [拡散光](../diffusion_light/README.md)        |
+| `0x100a2b48` / `0x100a2b4c`                | `ex_data`            | `エッジ抽出` の `ex_data_def`(`0x00ffffff`)/ `+0x70` フィールド表     | [エッジ抽出](../edge_extraction/README.md)    |
+| `0x100a2b84`                               | `+0x74` 拡張ブロック | `エッジ抽出`。表示スケール `{10, 100}` のみ、ドラッグ範囲は NULL      | [param_scaling](param_scaling.md)             |
+| `0x100a2bb0`                               | `FILTER_DLL`         | `エッジ抽出`(オブジェクトのみ)                                        | [エッジ抽出](../edge_extraction/README.md)    |
+| `0x100a2d24`                               | 文字列               | `RGB ( %d , %d , %d )`。`エッジ抽出` のボタンラベル書式               | [rgb_ycbcr](rgb_ycbcr.md)                     |
 | `0x100a3e28`                               | 配列                 | **`FILTER_DLL*` 配列の先頭**。すべての解析の入口                       | [filter_registration](filter_registration.md) |
 | `0x100a41e0`                               | 関数テーブル         | exedit 内部の描画関数テーブル。起動時に全構造体の `+0x64` へ書かれる   | [blend_modes](blend_modes.md)                 |
 | `0x100a59f8`                               | `FILTER_DLL`         | `閃光`(オブジェクトのみ)                                               | [閃光](../glint/README.md)                    |
@@ -420,6 +442,8 @@ y/cb/cr は素通りする。
 | `0x100d7594` / `0x100d7598`                | 方向ベクトル `dy = trunc(cos(角度)*65536)` / `dx = trunc(-sin(角度)*65536)` | `凸エッジ` | [angle_vector](angle_vector.md)        |
 | `0x1011efdc`                               | `強さ` から作った Q12 の不透明度                                           | `拡散光`   | [拡散光](../diffusion_light/README.md) |
 | `0x1011efe0` / `0x1011efe4`                | カーネル幅 / 現ラウンドの半径                                              | `拡散光`   | [拡散光](../diffusion_light/README.md) |
+| `0x10134e6c` / `0x10134e74`                | `しきい値`(符号付き)/ `強さ`。どちらも Q12                               | `エッジ抽出` | [エッジ抽出](../edge_extraction/README.md) |
+| `0x10134e70` / `0x10134e72` / `0x10134e78` | 光色の Cb / Cr / Y(word)。出力画素にそのまま書かれる                     | `エッジ抽出` | [エッジ抽出](../edge_extraction/README.md) |
 | `0x10135c68` / `0x10149840`                | 輝度カーブヘルパーの行幅[画素](8B / 6B)                                    | 共有       | [exp_log_curve](exp_log_curve.md)      |
 | `0x10178ec0` / `0x101790c8`                | **最大フレーム幅 / 高**。矩形転送・矩形クリアが6バイト画素で選ぶ側         | 共有       | [canvas_growth](canvas_growth.md)      |
 | `0x101920e0`                               | オブジェクトキャンバスの**最大高**                                         | 共有       | [canvas_growth](canvas_growth.md)      |
@@ -486,6 +510,9 @@ y/cb/cr は素通りする。
 | x87 の精度制御          | 53bit(MSVC の既定)か 64bit か。`シャドー` の「除算を先に丸めてから掛ける」出力で 1 単位の差になる([`シャドー` §5](../shadow/README.md)) |
 | x87 の `fsin` / `fcos`  | libm と1 ulp 違ううるので、`sin(角度)*65536` が整数のすぐ近くに落ちる **34個の (角度, 成分) の組**(すべて30度の倍数)で Q16 成分が 1 ずれうる([`angle_vector.md` §5](angle_vector.md)) |
 | `0x1009a410` の他の利用者 | `方向ブラー`/`フレームバッファ`/`斜めクリッピング`/`グラデーション` が同じ命令列で Q16 の2値を作るが、**どちらの成分を x に使うか**はワーカーを読んでいない([`angle_vector.md` §6](angle_vector.md)) |
+| `fp+0xE4`             | `クロマキー` がスポイト起動 `table[0x68]` に渡す値。`エッジ抽出` も色ダイアログの前後で同じ値を渡す。exedit 側の何を指すかは未追跡 |
+| `[fp+0x64]+0x6c`      | 色ダイアログの第3引数。bit `0x100` = 「指定なし」ボタンまでは確定。`拡張色設定` が使う `0x202`/`0x402` は未追跡 |
+| `[fp+0x64]+0x80` / `0x1004a7e0` | 色ダイアログの前後で必ず呼ばれる2つ。undo の開始とフィールドの dirty マークと推測しているだけ |
 | `fpip->flag & 0x200`  | exedit 側でいつ立つか。読み手は一様に「サンプル数を削ってよい」と解釈している                           |
 | `fpip+0xD4` / `+0xD8` | 単位。`閃光` の補正式から 1/4096 画素と推定しているだけ                                                 |
 | `aviutl.exe` 側       | 最終的な YCbCr→RGB 変換とクリップ。満輝度超過や色差の折り返しがどう出るかは全エフェクトで推定にとどまる |
