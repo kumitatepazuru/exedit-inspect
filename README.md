@@ -43,6 +43,7 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/convex_edge`](inspect/convex_edge/README.md)         | `凸エッジ`   | アルファの方向微分を輝度に足す面取り。暗側は乗算・明側は加算。**846バイトで解析済み最小** |
 | [`inspect/edge_extraction`](inspect/edge_extraction/README.md) | `エッジ抽出` | Prewitt オペレータ。エッジの強さがそのまま単色画像のアルファになる            |
 | [`inspect/sharp`](inspect/sharp/README.md)                     | `シャープ`   | アンシャープマスク。ぼかしの2ワーカーは `ぼかし` の `サイズ固定` 版と**命令単位で同一** |
+| [`inspect/fade`](inspect/fade/README.md)                       | `フェード`   | 入力が画素ではなく**時間**の初の解析対象。アルファに定数を掛けるだけ。**342バイトで解析済み最小** |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 
