@@ -42,14 +42,16 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/border`](inspect/border/README.md)                   | `縁取り`     | アルファを**割らずに**足して飽和させる = 膨張(dilation)。`ぼかし` は窓の和に掛かる利得 |
 | [`inspect/convex_edge`](inspect/convex_edge/README.md)         | `凸エッジ`   | アルファの方向微分を輝度に足す面取り。暗側は乗算・明側は加算。**846バイトで解析済み最小** |
 | [`inspect/edge_extraction`](inspect/edge_extraction/README.md) | `エッジ抽出` | Prewitt オペレータ。エッジの強さがそのまま単色画像のアルファになる            |
+| [`inspect/sharp`](inspect/sharp/README.md)                     | `シャープ`   | アンシャープマスク。ぼかしの2ワーカーは `ぼかし` の `サイズ固定` 版と**命令単位で同一** |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 
 同定済みのアドレス(関数・登録構造体・定数・グローバル)を1箇所に集めた索引と、
 エフェクトをまたいで共有されている実装の解説。合成モード、アルファ加重の
 ボックス平均、指数/対数の輝度カーブ、RGB→YCbCr、登録構造体とディスパッチ、
-キャンバス拡張、整数の丸め ―― このあたりは個別 README を読み直さなくても
-`inspect/common/` で足りる。**新しいエフェクトを解析するときの出発点**。
+キャンバス拡張、スレッド分割、整数の丸め ―― このあたりは個別 README を
+読み直さなくても `inspect/common/` で足りる。**新しいエフェクトを解析するときの
+出発点**。
 
 ## 共通ツール (`tools/`)
 
