@@ -45,6 +45,7 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/sharp`](inspect/sharp/README.md)                     | `シャープ`   | アンシャープマスク。ぼかしの2ワーカーは `ぼかし` の `サイズ固定` 版と**命令単位で同一** |
 | [`inspect/fade`](inspect/fade/README.md)                       | `フェード`   | 入力が画素ではなく**時間**の初の解析対象。アルファに定数を掛けるだけ。**342バイトで解析済み最小** |
 | [`inspect/wipe`](inspect/wipe/README.md)                       | `ワイプ`     | 進捗ランプは`フェード`と同型。5種の型(円・四角・時計・横・縦)でアルファをマスク。`円`だけ既定の向きが逆。カスタムPNGパターンは`シーンチェンジ`と`transition`フォルダを共有 |
+| [`inspect/diagonal_clipping`](inspect/diagonal_clipping/README.md) | `斜めクリッピング` | 直線からの符号付き距離1本でアルファをマスク。`幅` は0をまたいで不連続な3モードセレクタ(半平面 / 帯を残す / 帯を消す) |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 
