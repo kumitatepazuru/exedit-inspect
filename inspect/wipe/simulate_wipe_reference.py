@@ -72,18 +72,21 @@ def progress_ramp(frame, start, end, in_raw, out_raw, rate, scale, invert_in, in
 # -------------------------------------------------------------- patterns
 
 def circle_mask(w, h, g, invert):
-    cx, cy = w // 2, h // 2
     r2 = sar((w * w + h * h) * g, 12)
     band = 4 * int(math.sqrt(r2))
     out = [[0] * w for _ in range(h)]
     for y in range(h):
         for x in range(w):
-            d2 = (x - cx) ** 2 + (y - cy) ** 2
+            # 円だけ距離を2倍座標で測る(README §4)。実効半径が R/2 になり、
+            # g=4096 でちょうど四隅に届く。
+            d2 = (2 * x - w + 1) ** 2 + (2 * y - h + 1) ** 2
             v = (r2 - d2) if not invert else (d2 - r2)
             out[y][x] = 0 if v <= 0 else (0x1000 if v >= band else c_div(v << 12, band))
     return out
 
 
+# 四角/時計/横/縦は setcc の結果を dec+and 0x1000 で反転してから書くので、実効的な
+# 既定条件は `<=`、反転側は `>=` になる(README §4「読み間違えやすい点」)。
 def square_mask(w, h, g, invert):
     cx, cy = w // 2, h // 2
     threshold = sar((cx + cy) * g, 12)
@@ -91,7 +94,7 @@ def square_mask(w, h, g, invert):
     for y in range(h):
         for x in range(w):
             d1 = abs(x - cx) + abs(y - cy)
-            visible = (d1 > threshold) if not invert else (d1 < threshold)
+            visible = (d1 <= threshold) if not invert else (d1 >= threshold)
             out[y][x] = 0x1000 if visible else 0
     return out
 
@@ -101,7 +104,7 @@ def horizontal_mask(w, h, g, invert):
     out = [[0] * w for _ in range(h)]
     for y in range(h):
         for x in range(w):
-            visible = (x > threshold) if not invert else (x < threshold)
+            visible = (x <= threshold) if not invert else (x >= threshold)
             out[y][x] = 0x1000 if visible else 0
     return out
 
@@ -111,7 +114,7 @@ def vertical_mask(w, h, g, invert):
     out = [[0] * w for _ in range(h)]
     for y in range(h):
         for x in range(w):
-            visible = (y > threshold) if not invert else (y < threshold)
+            visible = (y <= threshold) if not invert else (y >= threshold)
             out[y][x] = 0x1000 if visible else 0
     return out
 
@@ -122,11 +125,15 @@ def clock_mask(w, h, g, invert):
     out = [[0] * w for _ in range(h)]
     for y in range(h):
         for x in range(w):
+            if x == cx and y == cy:
+                # 中心画素は fpatan を呼ばずに無条件で可視(0x10090b15 / 0x10090b83)。
+                out[y][x] = 0x1000
+                continue
             dx, dy = x - cx, y - cy
             ang = math.atan2(dy, dx)
             units = int(-ang * (65536 / (2 * math.pi))) & 0xFFFF
             swept = (0x4000 - units) & 0xFFFF
-            visible = (swept > threshold) if not invert else (swept < threshold)
+            visible = (swept <= threshold) if not invert else (swept >= threshold)
             out[y][x] = 0x1000 if visible else 0
     return out
 

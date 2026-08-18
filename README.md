@@ -44,8 +44,12 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/edge_extraction`](inspect/edge_extraction/README.md) | `エッジ抽出` | Prewitt オペレータ。エッジの強さがそのまま単色画像のアルファになる            |
 | [`inspect/sharp`](inspect/sharp/README.md)                     | `シャープ`   | アンシャープマスク。ぼかしの2ワーカーは `ぼかし` の `サイズ固定` 版と**命令単位で同一** |
 | [`inspect/fade`](inspect/fade/README.md)                       | `フェード`   | 入力が画素ではなく**時間**の初の解析対象。アルファに定数を掛けるだけ。**342バイトで解析済み最小** |
-| [`inspect/wipe`](inspect/wipe/README.md)                       | `ワイプ`     | 進捗ランプは`フェード`と同型。5種の型(円・四角・時計・横・縦)でアルファをマスク。`円`だけ既定の向きが逆。カスタムPNGパターンは`シーンチェンジ`と`transition`フォルダを共有 |
+| [`inspect/wipe`](inspect/wipe/README.md)                       | `ワイプ`     | 進捗ランプは`フェード`と同型。5種の型(円・四角・時計・横・縦)でアルファをマスク。カスタムPNGパターンは`シーンチェンジ`と`transition`フォルダを共有 |
 | [`inspect/diagonal_clipping`](inspect/diagonal_clipping/README.md) | `斜めクリッピング` | 直線からの符号付き距離1本でアルファをマスク。`幅` は0をまたいで不連続な3モードセレクタ(半平面 / 帯を残す / 帯を消す) |
+| [`inspect/emission_blur`](inspect/emission_blur/README.md)     | `放射ブラー` | 中心へ向かう線分を平均。`範囲` は「中心までの何%走るか」で、サンプル数の山の頂点がちょうどスライダー上限 750 |
+| [`inspect/directional_blur`](inspect/directional_blur/README.md) | `方向ブラー` | `角度` 方向に `±範囲` 画素の対称な線分を平均。`sin` 側が x であることを確定(`angle_vector.md` の保留を解消) |
+| [`inspect/lens_blur`](inspect/lens_blur/README.md)             | `レンズブラー` | **円板カーネル**で玉ボケを作る。`範囲` は半径ではなく縮小率 ―― 画像を最大22倍に縮めてから半径45でぼかす |
+| [`inspect/motion_blur`](inspect/motion_blur/README.md)         | `モーションブラー` | **時計を巻き戻して描き直す**唯一のエフェクト。サブフレーム標本の指数移動平均で、蓄積はキャッシュ経由でフレームをまたぐ |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 
