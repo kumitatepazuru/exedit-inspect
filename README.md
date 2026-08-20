@@ -50,6 +50,7 @@ uv run main.py tools.<ツール>          # tools/ 配下はドット区切り�
 | [`inspect/directional_blur`](inspect/directional_blur/README.md) | `方向ブラー` | `角度` 方向に `±範囲` 画素の対称な線分を平均。`sin` 側が x であることを確定(`angle_vector.md` の保留を解消) |
 | [`inspect/lens_blur`](inspect/lens_blur/README.md)             | `レンズブラー` | **円板カーネル**で玉ボケを作る。`範囲` は半径ではなく縮小率 ―― 画像を最大22倍に縮めてから半径45でぼかす |
 | [`inspect/motion_blur`](inspect/motion_blur/README.md)         | `モーションブラー` | **時計を巻き戻して描き直す**唯一のエフェクト。サブフレーム標本の指数移動平均で、蓄積はキャッシュ経由でフレームをまたぐ |
+| [`inspect/base`](inspect/base/README.md)                       | `座標`/`拡大率`/`透明度`/`回転`/`領域拡張`/`リサイズ`/`ローテーション`/`反転` | `標準描画`/`拡張描画` と同名だが**コードは共有せず fpip の状態だけ共有**。前者4つは画素に触れず加算・合成するだけの「遅延蓄積系」、後者4つはその場でピクセルを書き換える「即時ピクセル系」 |
 
 ## アドレス図鑑と共通実装 ([`inspect/common`](inspect/common/README.md))
 
